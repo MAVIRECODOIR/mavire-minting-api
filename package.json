@@ -1,17 +1,29 @@
 {
-  "name": "vercel-functions",
-  "version": "1.0.0",
-  "description": "",
+  "name": "mavire-minting-api",
+  "version": "3.0.0",
+  "description": "Complete Shopify to NFT minting pipeline for Mavire Codoir",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@thirdweb-dev/sdk": "^4.0.60",
+    "express": "^4.18.0",
+    "thirdweb": "^4.0.0",
+    "canvas": "^2.11.2",
+    "sharp": "^0.32.0",
+    "uuid": "^9.0.0",
+    "moment": "^2.29.4",
+    "@supabase/supabase-js": "^2.38.0",
+    "ethers": "^6.8.0",
+    "crypto-js": "^4.2.0",
+    "nodemailer": "^6.9.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.0",
+    "joi": "^17.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
