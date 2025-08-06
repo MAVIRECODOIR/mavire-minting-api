@@ -1,8 +1,11 @@
+require('dotenv').config();
+console.log('Starting server...');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { ThirdwebSDK } = require('thirdweb');
+const { ThirdwebSDK } = require('@thirdweb-dev/sdk');
 const { v4: uuidv4 } = require('uuid');
 const Joi = require('joi');
 
@@ -11,7 +14,32 @@ const DatabaseService = require('./databaseService');
 const WalletService = require('./walletService');
 const MicrosoftGraphEmailService = require('./emailService');
 
+console.log('Dependencies loaded');
+
+// Validate environment variables
+const requiredEnvVars = [
+  'THIRDWEB_CLIENT_ID',
+  'THIRDWEB_SECRET_KEY',
+  'THIRDWEB_PRIVATE_KEY',
+  'THIRDWEB_CONTRACT_ADDRESS',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'ENCRYPTION_KEY',
+  'MICROSOFT_CLIENT_ID',
+  'MICROSOFT_CLIENT_SECRET',
+  'MICROSOFT_TENANT_ID',
+  'FROM_EMAIL'
+];
+requiredEnvVars.forEach(varName => {
+  if (!process.env[varName]) {
+    throw new Error(`Missing required environment variable: ${varName}`);
+  }
+});
+console.log('Environment variables validated');
+
 const app = express();
+console.log('Express app created');
+
 const coaGenerator = new CoAGenerator();
 const db = new DatabaseService();
 const walletService = new WalletService();
@@ -209,8 +237,9 @@ app.post('/api/claim/process', async (req, res) => {
     // Initialize ThirdWeb and mint NFT
     const sdk = ThirdwebSDK.fromPrivateKey(
       process.env.THIRDWEB_PRIVATE_KEY,
-      process.env.THIRDWEB_CHAIN || "polygon"
-    );
+      process.env.THIRDWEB_CHAIN || "polygon",
+    { clientId: process.env.THIRDWEB_CLIENT_ID }
+);
 
     const contract = await sdk.getContract(process.env.THIRDWEB_CONTRACT_ADDRESS);
 
@@ -327,7 +356,7 @@ app.get('/api/claim/status/:token', async (req, res) => {
         name: claim.orders.product_name,
         sku: claim.orders.product_sku
       },
-      createdAt: claim.created_at,
+      createdAt:alf claim.created_at,
       expiresAt: claim.expires_at
     };
 
@@ -463,6 +492,16 @@ app.use((req, res) => {
       'GET /api/admin/status'
     ]
   });
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 const port = process.env.PORT || 3000;
