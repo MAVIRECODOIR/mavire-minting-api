@@ -23,8 +23,9 @@ class WalletService {
 
   generateWalletFromEntropy(customEntropy) {
     try {
-      const entropy = ethers.keccak256(ethers.toUtf8Bytes(customEntropy));
-      const wallet = new ethers.Wallet(entropy);
+      const seed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(customEntropy));
+      const hdNode = ethers.utils.HDNode.fromSeed(seed);
+      const wallet = new ethers.Wallet(hdNode.privateKey);
       
       return {
         address: wallet.address,
@@ -40,7 +41,7 @@ class WalletService {
 
   isValidAddress(address) {
     try {
-      return ethers.isAddress(address);
+      return ethers.utils.isAddress(address);
     } catch (error) {
       return false;
     }
@@ -48,9 +49,9 @@ class WalletService {
 
   async getWalletBalance(address, rpcUrl) {
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
       const balance = await provider.getBalance(address);
-      return ethers.formatEther(balance);
+      return ethers.utils.formatEther(balance);
     } catch (error) {
       console.error('Error getting wallet balance:', error);
       return '0.0';
