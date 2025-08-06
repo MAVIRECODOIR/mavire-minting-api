@@ -9,13 +9,13 @@ const Joi = require('joi');
 const CoAGenerator = require('./coaGenerator');
 const DatabaseService = require('./databaseService');
 const WalletService = require('./walletService');
-const EmailService = require('./emailService');
+const MicrosoftGraphEmailService = require('./emailService');
 
 const app = express();
 const coaGenerator = new CoAGenerator();
 const db = new DatabaseService();
 const walletService = new WalletService();
-const emailService = new EmailService();
+const emailService = new MicrosoftGraphEmailService();
 
 // Security middleware
 app.use(helmet());
