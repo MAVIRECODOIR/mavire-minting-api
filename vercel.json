@@ -1,1 +1,16 @@
-
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "functions/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/mint",
+      "methods": ["POST"],
+      "dest": "functions/index.js"
+    }
+  ]
+}
