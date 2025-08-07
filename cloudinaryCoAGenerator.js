@@ -1,6 +1,7 @@
 /**
  * Cloudinary-based Certificate of Authenticity Generator
  * Uses Cloudinary's URL transformation API for text overlay
+ * PRIVACY-FOCUSED: Does not display customer names publicly
  */
 
 class CloudinaryCoAGenerator {
@@ -12,7 +13,7 @@ class CloudinaryCoAGenerator {
   /**
    * Generate Certificate of Authenticity URL using Cloudinary transformations
    * @param {Object} data - Certificate data
-   * @param {string} data.customerName - Customer's full name
+   * @param {string} data.customerName - Customer's full name (PRIVATE - not displayed)
    * @param {string} data.productName - Product name
    * @param {string} data.authenticityId - Unique authenticity ID
    * @param {string} data.serialNumber - Serial number
@@ -22,7 +23,7 @@ class CloudinaryCoAGenerator {
   generateCertificateUrl(data) {
     try {
       const {
-        customerName = 'Customer Name',
+        customerName = 'Customer Name', // NOT USED - kept for compatibility
         productName = 'Mavire Product',
         authenticityId = 'AUTH-000000',
         serialNumber = 'SN-000000',
@@ -33,21 +34,22 @@ class CloudinaryCoAGenerator {
       const formattedDate = this.formatDate(purchaseDate);
 
       // Create text overlays with proper positioning
+      // NOTE: Customer name is NOT included to protect privacy
       const overlays = [
-        // Customer Name - Main placement (center, y_390)
-        `l_text:Amiri_30:${this.encodeText(customerName)},co_black,g_center,y_390`,
+        // Product Name - Center top area
+        `l_text:Amiri_24:${this.encodeText(productName)},co_black,g_center,y_320`,
         
-        // Product Name - Above customer name
-        `l_text:Amiri_20:${this.encodeText(productName)},co_black,g_center,y_320`,
+        // Authenticity ID - Center main area (where customer name was)
+        `l_text:Amiri_20:${this.encodeText(authenticityId)},co_black,g_center,y_390`,
         
-        // Authenticity ID - Below customer name
-        `l_text:Amiri_16:${this.encodeText(authenticityId)},co_black,g_center,y_450`,
+        // Serial Number - Center below authenticity ID
+        `l_text:Amiri_18:${this.encodeText(serialNumber)},co_black,g_center,y_430`,
         
         // Date - Bottom left area
         `l_text:Amiri_14:${this.encodeText(formattedDate)},co_black,g_south_west,x_50,y_50`,
         
-        // Serial Number - Bottom right area
-        `l_text:Amiri_14:${this.encodeText(serialNumber)},co_black,g_south_east,x_50,y_50`
+        // Brand name - Bottom right area
+        `l_text:Amiri_14:Mavire%20Codoir,co_black,g_south_east,x_50,y_50`
       ];
 
       // Combine all overlays
@@ -56,7 +58,7 @@ class CloudinaryCoAGenerator {
       // Build final URL
       const certificateUrl = `${this.baseUrl}/${transformations}/${this.baseImageId}.jpg`;
 
-      console.log('Generated Certificate URL:', certificateUrl);
+      console.log('Generated Certificate URL (Privacy Protected):', certificateUrl);
       return certificateUrl;
 
     } catch (error) {
@@ -119,7 +121,7 @@ class CloudinaryCoAGenerator {
    */
   testGeneration() {
     const sampleData = {
-      customerName: 'John Doe',
+      customerName: 'John Doe', // This will NOT appear on certificate
       productName: 'Mavire Luxury Item',
       authenticityId: 'AUTH-123456',
       serialNumber: 'MV-2024-001',
@@ -132,7 +134,8 @@ class CloudinaryCoAGenerator {
       success: true,
       sampleData,
       certificateUrl: url,
-      message: 'Certificate generation test completed'
+      message: 'Privacy-protected certificate generation test completed',
+      privacyNote: 'Customer name is NOT displayed on certificate for privacy protection'
     };
   }
 
@@ -143,19 +146,19 @@ class CloudinaryCoAGenerator {
   generateTestCertificates() {
     const testCases = [
       {
-        customerName: 'John Doe',
+        customerName: 'John Doe', // Private - not shown
         productName: 'Mavire Classic',
         authenticityId: 'AUTH-001',
         serialNumber: 'MV-001'
       },
       {
-        customerName: 'Jane Smith',
+        customerName: 'Jane Smith', // Private - not shown
         productName: 'Mavire Premium Collection',
         authenticityId: 'AUTH-002',
         serialNumber: 'MV-002'
       },
       {
-        customerName: 'Michael Johnson',
+        customerName: 'Michael Johnson', // Private - not shown
         productName: 'Mavire Limited Edition',
         authenticityId: 'AUTH-003',
         serialNumber: 'MV-003'
@@ -165,8 +168,49 @@ class CloudinaryCoAGenerator {
     return testCases.map((testData, index) => ({
       testCase: index + 1,
       data: testData,
-      certificateUrl: this.generateCertificateUrl(testData)
+      certificateUrl: this.generateCertificateUrl(testData),
+      privacyNote: 'Customer name kept private - not displayed on certificate'
     }));
+  }
+
+  /**
+   * Generate a private customer certificate with name (for internal use only)
+   * This method includes customer name and should only be used for private records
+   * @param {Object} data - Certificate data
+   * @returns {string} Cloudinary URL with customer name (for private use)
+   */
+  generatePrivateCertificateUrl(data) {
+    try {
+      const {
+        customerName = 'Customer Name',
+        productName = 'Mavire Product',
+        authenticityId = 'AUTH-000000',
+        serialNumber = 'SN-000000',
+        purchaseDate = new Date()
+      } = data;
+
+      const formattedDate = this.formatDate(purchaseDate);
+
+      // This version INCLUDES customer name - for internal use only
+      const overlays = [
+        // Customer Name - Private version only
+        `l_text:Amiri_30:${this.encodeText(customerName)},co_black,g_center,y_390`,
+        `l_text:Amiri_20:${this.encodeText(productName)},co_black,g_center,y_320`,
+        `l_text:Amiri_16:${this.encodeText(authenticityId)},co_black,g_center,y_450`,
+        `l_text:Amiri_14:${this.encodeText(formattedDate)},co_black,g_south_west,x_50,y_50`,
+        `l_text:Amiri_14:${this.encodeText(serialNumber)},co_black,g_south_east,x_50,y_50`
+      ];
+
+      const transformations = overlays.join('/');
+      const certificateUrl = `${this.baseUrl}/${transformations}/${this.baseImageId}.jpg`;
+
+      console.log('Generated PRIVATE Certificate URL (includes customer name):', certificateUrl);
+      return certificateUrl;
+
+    } catch (error) {
+      console.error('Error generating private certificate URL:', error);
+      return `${this.baseUrl}/${this.baseImageId}.jpg`;
+    }
   }
 }
 
