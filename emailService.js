@@ -161,9 +161,12 @@ class MicrosoftGraphEmailService {
       </head>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center; color: white; border-radius: 15px 15px 0 0;">
-              <h1 style="margin: 0; font-size: 36px; font-weight: bold; letter-spacing: 2px;">MAVIRE CODOIR</h1>
+              <a href="https://mavirecodoir.com" target="_blank" style="display: inline-block;">
+                <img src="https://res.cloudinary.com/dd3cjiork/image/upload/v1754541227/Manvire_Codoir_W_-_LOGO_gycswo.png" alt="Mavire Codoir Logo" style="height: 36px;">
+              </a>
               <p style="margin: 15px 0 0 0; font-size: 18px; opacity: 0.95; font-weight: 300;">Certificate of Authenticity</p>
           </div>
+
           
           <div style="background: white; padding: 40px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
               <h2 style="color: #2c3e50; margin-bottom: 25px; font-size: 28px; text-align: center;">Thank you for your purchase! 🎉</h2>
@@ -224,7 +227,7 @@ class MicrosoftGraphEmailService {
           </div>
           
           <div style="background: #2c3e50; padding: 25px 30px; text-align: center; color: #bdc3c7; font-size: 13px; border-radius: 0 0 15px 15px;">
-              <p style="margin: 0 0 10px 0;">© 2024 Mavire Codoir. All rights reserved.</p>
+              <p style="margin: 0 0 10px 0;">© 2026 Mavire Codoir. All rights reserved.</p>
               <p style="margin: 0; opacity: 0.8;">This email was sent regarding your recent purchase. Please do not reply to this email.</p>
           </div>
       </body>
@@ -302,7 +305,7 @@ class MicrosoftGraphEmailService {
           </div>
           
           <div style="background: #2c3e50; padding: 25px 30px; text-align: center; color: #bdc3c7; font-size: 13px; border-radius: 0 0 15px 15px;">
-              <p style="margin: 0 0 10px 0;">© 2024 Mavire Codoir. All rights reserved.</p>
+              <p style="margin: 0 0 10px 0;">© 2025 Mavire Codoir. All rights reserved.</p>
               <p style="margin: 0; opacity: 0.8;">Your NFT certificate is permanently stored on the blockchain.</p>
           </div>
       </body>
