@@ -30,7 +30,6 @@ if (missingVars.length > 0) {
 const app = express();
 
 // Initialize services
-const CloudinaryCoAGenerator = require('./cloudinaryCoAGenerator');
 const coaGenerator = new CloudinaryCoAGenerator();
 const db = new DatabaseService();
 const walletService = new WalletService();
@@ -79,6 +78,7 @@ app.get('/', (req, res) => {
       'POST /api/claim/process - Process NFT claim',
       'GET /api/claim/status/:token - Get claim status',
       'POST /api/generate-coa - Generate CoA URL',
+      'GET /api/test/coa - Test CoA generation',
       'GET /api/admin/status - System status'
     ]
   });
@@ -272,13 +272,15 @@ app.post('/api/claim/process', async (req, res) => {
     console.log('💳 Generated wallet:', walletData.address);
 
     // Generate CoA URL using Cloudinary
-    const coaResult = coaGenerator.generateCoAUrl({
+    const coaResult = coaGenerator.generateCertificateUrl({
+      customerName: email.split('@')[0], // Use email prefix as customer name
       productName: claim.orders?.product_name || 'Unknown Product',
-      sku: claim.orders?.product_sku || 'NO-SKU',
-      shopifyOrderId: claim.orders?.shopify_order_id || 'unknown'
+      authenticityId: `AUTH-${Date.now()}`,
+      serialNumber: claim.orders?.product_sku || 'NO-SKU',
+      purchaseDate: new Date(claim.created_at)
     });
 
-    console.log('🎨 Generated CoA URL:', coaResult.imageUrl);
+    console.log('🎨 Generated CoA URL:', coaResult);
 
     // Initialize ThirdWeb and mint NFT
     const sdk = ThirdwebSDK.fromPrivateKey(
@@ -295,7 +297,7 @@ app.post('/api/claim/process', async (req, res) => {
     const nftMetadata = {
       name: `${claim.orders?.product_name || 'Unknown Product'} - Certificate of Authenticity`,
       description: `Official Certificate of Authenticity for ${claim.orders?.product_name || 'Unknown Product'} by Mavire Codoir`,
-      image: coaResult.imageUrl, // Use Cloudinary URL
+      image: coaResult, // Use Cloudinary URL
       attributes: [
         {
           trait_type: "Product Name",
@@ -307,11 +309,11 @@ app.post('/api/claim/process', async (req, res) => {
         },
         {
           trait_type: "Authenticity ID",
-          value: coaResult.uniqueId
+          value: `AUTH-${Date.now()}`
         },
         {
           trait_type: "Authorization Date",
-          value: coaResult.authDate
+          value: new Date().toLocaleDateString('en-US')
         },
         {
           trait_type: "Order Number",
@@ -323,7 +325,7 @@ app.post('/api/claim/process', async (req, res) => {
         }
       ],
       properties: {
-        authenticity_id: coaResult.uniqueId,
+        authenticity_id: `AUTH-${Date.now()}`,
         generated_at: new Date().toISOString(),
         brand: "Mavire Codoir",
         type: "Certificate of Authenticity",
@@ -343,7 +345,7 @@ app.post('/api/claim/process', async (req, res) => {
       {
         tokenId: mintResult.id.toString(),
         transactionHash: mintResult.receipt.transactionHash,
-        coaUniqueId: coaResult.uniqueId,
+        coaUniqueId: `AUTH-${Date.now()}`,
         metadata: nftMetadata
       }
     );
@@ -367,10 +369,10 @@ app.post('/api/claim/process', async (req, res) => {
           privateKey: walletData.privateKey // Include for customer
         },
         coa: {
-          uniqueId: coaResult.uniqueId,
-          authDate: coaResult.authDate,
-          filename: coaResult.filename,
-          imageUrl: coaResult.imageUrl
+          uniqueId: `AUTH-${Date.now()}`,
+          authDate: new Date().toLocaleDateString('en-US'),
+          filename: 'certificate.jpg',
+          imageUrl: coaResult
         }
       }
     });
@@ -437,9 +439,11 @@ app.get('/api/claim/status/:token', async (req, res) => {
 app.post('/api/generate-coa', async (req, res) => {
   try {
     const schema = Joi.object({
+      customerName: Joi.string().required(),
       productName: Joi.string().required(),
-      sku: Joi.string().required(),
-      shopifyOrderId: Joi.string().required()
+      authenticityId: Joi.string().optional(),
+      serialNumber: Joi.string().optional(),
+      purchaseDate: Joi.date().optional()
     });
 
     const { error, value } = schema.validate(req.body);
@@ -447,16 +451,18 @@ app.post('/api/generate-coa', async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const coaResult = coaGenerator.generateCoAUrl(value);
+    const coaResult = coaGenerator.generateCertificateUrl({
+      customerName: value.customerName,
+      productName: value.productName,
+      authenticityId: value.authenticityId || `AUTH-${Date.now()}`,
+      serialNumber: value.serialNumber || 'MV-001',
+      purchaseDate: value.purchaseDate || new Date()
+    });
 
     res.json({
       success: true,
-      data: {
-        imageUrl: coaResult.imageUrl,
-        uniqueId: coaResult.uniqueId,
-        authDate: coaResult.authDate,
-        filename: coaResult.filename
-      }
+      certificateUrl: coaResult,
+      message: 'Certificate URL generated successfully'
     });
 
   } catch (error) {
@@ -471,16 +477,44 @@ app.post('/api/generate-coa', async (req, res) => {
 // Test Cloudinary endpoint
 app.get('/api/test/coa', (req, res) => {
   try {
-    const testResult = coaGenerator.generateTestCoA();
+    console.log('🧪 Testing Cloudinary CoA generation...');
+    const testResult = coaGenerator.testGeneration();
+    
     res.json({
       success: true,
-      message: 'Cloudinary CoA generation test',
-      testResult
+      message: 'Cloudinary CoA generation test completed',
+      ...testResult,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('CoA test failed:', error);
     res.status(500).json({
       error: 'Test failed',
-      details: error.message
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Test multiple CoA variations
+app.get('/api/test/coa-multiple', (req, res) => {
+  try {
+    console.log('🧪 Testing multiple Cloudinary CoA variations...');
+    const testResults = coaGenerator.generateTestCertificates();
+    
+    res.json({
+      success: true,
+      message: 'Multiple CoA generation test completed',
+      testResults,
+      count: testResults.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Multiple CoA test failed:', error);
+    res.status(500).json({
+      error: 'Multiple test failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -566,6 +600,7 @@ app.use((req, res) => {
       'GET /api/claim/status/:token',
       'POST /api/generate-coa',
       'GET /api/test/coa',
+      'GET /api/test/coa-multiple',
       'GET /api/admin/status'
     ]
   });
