@@ -30,6 +30,7 @@ if (missingVars.length > 0) {
 const app = express();
 
 // Initialize services
+const CloudinaryCoAGenerator = require('./cloudinaryCoAGenerator');
 const coaGenerator = new CloudinaryCoAGenerator();
 const db = new DatabaseService();
 const walletService = new WalletService();
