@@ -37,7 +37,7 @@ class CloudinaryCoAGenerator {
       // NOTE: Customer name is NOT included to protect privacy
       const overlays = [
         // Product Name - Center top area
-        `l_text:Amiri_24:${this.encodeText(productName)},co_black,g_center,y_320`,
+        `l_text:Amiri_24:${this.encodeText(productName)},co_black,g_center,y_360`,
         
         // Authenticity ID - Center main area (where customer name was)
         `l_text:Amiri_20:${this.encodeText(authenticityId)},co_black,g_center,y_390`,
