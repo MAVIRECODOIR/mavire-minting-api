@@ -356,7 +356,7 @@ app.get('/api/claim/status/:token', async (req, res) => {
         name: claim.orders.product_name,
         sku: claim.orders.product_sku
       },
-      createdAt:alf claim.created_at,
+      createdAt: claim.created_at,,
       expiresAt: claim.expires_at
     };
 
