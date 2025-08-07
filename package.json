@@ -23,9 +23,6 @@
     "uuid": "^9.0.0"
   },
   "engines": {
-    "node": "22.x"
-  },
-  "devDependencies": {
-    "@vercel/ncc": "^0.38.3"
+    "node": "18.x"
   }
 }
