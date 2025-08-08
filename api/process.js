@@ -1,8 +1,16 @@
 export default async function handler(req, res) {
+<<<<<<< HEAD:api/process.js
+=======
+  // CORS headers
+>>>>>>> 0a16e4d2cc5bd4271ba4f0b6dd0447e869dfc8be:api/claim/process.js
   res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+<<<<<<< HEAD:api/process.js
+=======
+  // Handle preflight requests
+>>>>>>> 0a16e4d2cc5bd4271ba4f0b6dd0447e869dfc8be:api/claim/process.js
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -19,6 +27,11 @@ export default async function handler(req, res) {
       throw new Error('Missing email or claim token');
     }
 
+<<<<<<< HEAD:api/process.js
+=======
+    // TODO: Implement NFT minting logic
+    // Example: Create wallet, mint NFT on Polygon
+>>>>>>> 0a16e4d2cc5bd4271ba4f0b6dd0447e869dfc8be:api/claim/process.js
     const walletData = {
       walletAddress: 'generated-wallet-address',
       privateKey: 'generated-private-key',
@@ -34,6 +47,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Claim process error:', error);
     res.status(500).json({ error: error.message || 'Failed to process claim' });
+<<<<<<< HEAD:api/process.js
   }
 }
 {
@@ -47,5 +61,7 @@ export default async function handler(req, res) {
     "tokenId": "42",
     "transactionHash": "0x...",
     "contractAddress": "0x..."
+=======
+>>>>>>> 0a16e4d2cc5bd4271ba4f0b6dd0447e869dfc8be:api/claim/process.js
   }
 }
