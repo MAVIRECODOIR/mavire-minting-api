@@ -17,27 +17,24 @@ export default async function handler(req, res) {
   const { email, claimToken } = req.body;
 
   try {
-    // TODO: Implement actual NFT minting logic
-    // Create wallet, mint NFT on Polygon, store in database
     if (!email || !claimToken) {
       throw new Error('Missing email or claim token');
     }
 
-    // Mock response for testing
-    const responseData = {
-      wallet: {
-        address: '0x742d35Cc6634C0532925a3b8D2D4b2b5',
-        privateKey: '0x...',
-        mnemonic: 'abandon ability able about above absent absorb abstract absurd abuse access accident',
-      },
-      nft: {
-        tokenId: '42',
-        transactionHash: '0x...',
-        contractAddress: '0x...',
-      },
+    // TODO: Implement NFT minting logic
+    // Example: Create wallet, mint NFT on Polygon
+    const walletData = {
+      walletAddress: 'generated-wallet-address',
+      privateKey: 'generated-private-key',
+      recoveryPhrase: 'generated-recovery-phrase',
+      nftTokenId: 'minted-nft-id',
+      nftContractAddress: 'your-contract-address',
+      transactionHash: 'blockchain-tx-hash',
+      blockchainNetwork: 'Polygon',
+      explorerUrl: `https://polygonscan.com/tx/blockchain-tx-hash`,
     };
 
-    res.status(200).json(responseData);
+    res.status(200).json(walletData);
   } catch (error) {
     console.error('Claim process error:', error);
     res.status(500).json({ error: error.message || 'Failed to process claim' });
