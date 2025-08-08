@@ -7,7 +7,6 @@
   <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/axios@1/dist/axios.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -35,16 +34,21 @@
       const fetchStatus = async (token) => {
         setLoading(true);
         try {
-          const response = await axios.get(`${API_BASE}/api/admin/status`, {
+          const response = await fetch(`${API_BASE}/api/admin/status`, {
+            method: 'GET',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             }
           });
-          setStatus(response.data);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to fetch status`);
+          }
+          const data = await response.json();
+          setStatus(data);
         } catch (err) {
-          setError('Failed to fetch system status. Invalid API token?');
-          console.error('Status fetch error:', err);
+          console.error('Fetch error:', err.message);
+          setError('Failed to fetch system status. Invalid API token or server error.');
         } finally {
           setLoading(false);
         }
@@ -155,16 +159,7 @@
                   <div className="bg-gray-700 p-6 rounded-lg col-span-1 md:col-span-2">
                     <h3 className="text-lg font-semibold text-yellow-400 mb-4">Available Endpoints</h3>
                     <ul className="list-disc list-inside text-gray-300">
-                      {[
-                        'POST /webhook/shopify - Shopify order webhook',
-                        'POST /api/claim/verify - Verify claim eligibility',
-                        'POST /api/claim/process - Process NFT claim',
-                        'GET /api/claim/status/:token - Get claim status',
-                        'POST /api/generate-coa - Generate CoA URL',
-                        'GET /api/test/coa - Test CoA generation',
-                        'GET /api/test/coa-multiple - Test multiple CoA generation',
-                        'GET /api/admin/status - System status'
-                      ].map((endpoint, index) => (
+                      {status.endpoints.map((endpoint, index) => (
                         <li key={index}>{endpoint}</li>
                       ))}
                     </ul>
