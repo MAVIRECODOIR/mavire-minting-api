@@ -16,47 +16,57 @@
 
     const AdminPortal = () => {
       const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [apiToken, setApiToken] = useState('');
       const [status, setStatus] = useState(null);
       const [error, setError] = useState('');
       const [loading, setLoading] = useState(false);
 
-      const VERCEL_AUTH_URL = 'https://vercel.com/oauth/authorize?client_id=YOUR_VERCEL_CLIENT_ID&redirect_uri=https://mavire-minting-api.vercel.app/api/admin&scope=user';
       const API_BASE = 'https://mavire-minting-api.vercel.app';
 
       useEffect(() => {
-        // Check for Vercel OAuth token in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        if (code) {
-          // Exchange code for token (simplified, requires backend endpoint)
+        const token = localStorage.getItem('vercel_api_token');
+        if (token) {
+          setApiToken(token);
           setIsAuthenticated(true);
-          window.history.replaceState({}, document.title, '/api/admin');
-          fetchStatus();
+          fetchStatus(token);
         }
       }, []);
 
-      const fetchStatus = async () => {
+      const fetchStatus = async (token) => {
         setLoading(true);
         try {
           const response = await axios.get(`${API_BASE}/api/admin/status`, {
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
           });
           setStatus(response.data);
         } catch (err) {
-          setError('Failed to fetch system status');
+          setError('Failed to fetch system status. Invalid API token?');
           console.error('Status fetch error:', err);
         } finally {
           setLoading(false);
         }
       };
 
-      const handleLogin = () => {
-        window.location.href = VERCEL_AUTH_URL;
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (!apiToken) {
+          setError('Please enter a valid Vercel API token');
+          return;
+        }
+        localStorage.setItem('vercel_api_token', apiToken);
+        setIsAuthenticated(true);
+        fetchStatus(apiToken);
       };
 
       const handleLogout = () => {
+        localStorage.removeItem('vercel_api_token');
         setIsAuthenticated(false);
+        setApiToken('');
         setStatus(null);
+        setError('');
       };
 
       if (!isAuthenticated) {
@@ -68,14 +78,26 @@
                 alt="Mavire Codoir Logo"
                 className="h-16 mx-auto mb-6"
               />
-              <h1 className="text-3xl font-serif text-gold-400 mb-4">Mavire Codoir Admin Portal</h1>
-              <p className="text-gray-300 mb-6">Sign in with your Vercel account to access the admin dashboard.</p>
-              <button
-                onClick={handleLogin}
-                className="bg-gold-400 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-gold-500 transition-all duration-200"
-              >
-                Sign in with Vercel
-              </button>
+              <h1 className="text-3xl font-serif text-yellow-400 mb-4">Mavire Codoir Admin Portal</h1>
+              <p className="text-gray-300 mb-6">Enter your Vercel API token to access the admin dashboard.</p>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <input
+                  type="password"
+                  value={apiToken}
+                  onChange={(e) => setApiToken(e.target.value)}
+                  placeholder="Enter Vercel API Token"
+                  className="w-full px-4 py-2 bg-gray-700 text-gray-100 border border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none"
+                />
+                {error && (
+                  <p className="text-red-400 text-sm">{error}</p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full bg-yellow-400 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-yellow-500 transition-all duration-200"
+                >
+                  Sign In
+                </button>
+              </form>
             </div>
           </div>
         );
@@ -91,7 +113,7 @@
                   alt="Mavire Codoir Logo"
                   className="h-12 mr-4"
                 />
-                <h1 className="text-2xl font-bold text-gold-400">Mavire Codoir Admin Portal</h1>
+                <h1 className="text-2xl font-bold text-yellow-400">Mavire Codoir Admin Portal</h1>
               </div>
               <button
                 onClick={handleLogout}
@@ -103,10 +125,10 @@
           </header>
           <main className="container mx-auto px-4 py-8">
             <div className="bg-gray-800 bg-opacity-90 p-8 rounded-xl shadow-2xl">
-              <h2 className="text-2xl font-bold text-gold-400 mb-6">System Status</h2>
+              <h2 className="text-2xl font-bold text-yellow-400 mb-6">System Status</h2>
               {loading && (
                 <div className="text-center">
-                  <div className="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 </div>
               )}
               {error && (
@@ -117,21 +139,21 @@
               {status && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-700 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gold-400 mb-4">System Overview</h3>
+                    <h3 className="text-lg font-semibold text-yellow-400 mb-4">System Overview</h3>
                     <p><strong>Status:</strong> {status.status}</p>
                     <p><strong>Version:</strong> {status.version}</p>
                     <p><strong>Uptime:</strong> {(status.uptime / 3600).toFixed(2)} hours</p>
                     <p><strong>Timestamp:</strong> {new Date(status.timestamp).toLocaleString()}</p>
                   </div>
                   <div className="bg-gray-700 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gold-400 mb-4">Services</h3>
+                    <h3 className="text-lg font-semibold text-yellow-400 mb-4">Services</h3>
                     <p><strong>Database:</strong> {status.services.database}</p>
                     <p><strong>Blockchain:</strong> {status.services.blockchain}</p>
                     <p><strong>Image Generation:</strong> {status.services.imageGeneration}</p>
                     <p><strong>Email:</strong> {status.services.email}</p>
                   </div>
                   <div className="bg-gray-700 p-6 rounded-lg col-span-1 md:col-span-2">
-                    <h3 className="text-lg font-semibold text-gold-400 mb-4">Available Endpoints</h3>
+                    <h3 className="text-lg font-semibold text-yellow-400 mb-4">Available Endpoints</h3>
                     <ul className="list-disc list-inside text-gray-300">
                       {[
                         'POST /webhook/shopify - Shopify order webhook',
