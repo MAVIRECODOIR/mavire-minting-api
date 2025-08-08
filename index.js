@@ -79,8 +79,10 @@ app.get('/', (req, res) => {
       'GET /api/claim/status/:token - Get claim status',
       'POST /api/generate-coa - Generate CoA URL',
       'GET /api/test/coa - Test CoA generation',
-      'GET /api/admin/status - System status'
-    ]
+      'GET /api/test/coa-multiple - Test multiple CoA generation',
+      'GET /api/admin/status - System status',
+      'GET /api/admin - Admin UI'
+]
   });
 });
 
