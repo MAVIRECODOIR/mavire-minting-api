@@ -565,7 +565,6 @@ app.get('/admin', (req, res) => {
       </div>
       
       <script>
-        // ${Buffer.from(`
         let currentSession = null;
         let activeSection = null;
         
@@ -861,8 +860,6 @@ app.get('/admin', (req, res) => {
             loadSystemStatus();
           }
         }, 30000);
-        `).toString('base64')}
-        eval(atob(document.currentScript.textContent.split('base64')[1].split("'")[1]));
       </script>
     </body>
     </html>
