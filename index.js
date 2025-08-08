@@ -586,7 +586,7 @@ app.get('/admin', (req, res) => {
           loginBtn.textContent = 'Authenticating...';
           
           try {
-            const response = await fetch('/api/admin/login', {
+            const response = await fetch('/api/admin/login-vercel', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
