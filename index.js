@@ -125,6 +125,8 @@ app.get('/', (req, res) => {
   res.send(originalHtml);
 });
 
+// Add this to your index.js file, right after the existing admin login endpoint
+
 // Alternative admin login that validates Vercel API token
 app.post('/api/admin/login-vercel', adminLoginLimiter, async (req, res) => {
   try {
