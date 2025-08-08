@@ -1696,6 +1696,8 @@ app.use((req, res) => {
     availableEndpoints: [
       'GET / - Main page',
       'GET /admin - Admin Dashboard (requires authentication)',
+      'GET /api/admin',
+      'GET /api/admin/status',
       'POST /webhook/shopify - Shopify webhook handler',
       'POST /api/claim/verify - Verify NFT claim eligibility',
       'POST /api/claim/process - Process NFT claim',
