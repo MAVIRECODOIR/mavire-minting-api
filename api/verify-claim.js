@@ -23,3 +23,11 @@ export default async function handler(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+{
+  "order": {
+    "orderNumber": "12345",
+    "productName": "Product Name",
+    "customerName": "Customer Name",
+    "createdAt": "2025-01-01"
+  }
+}
