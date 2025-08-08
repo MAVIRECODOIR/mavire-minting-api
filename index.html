@@ -50,7 +50,7 @@
             padding: 40px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             width: 100%;
-            max-width: 400px;
+            max-width: 500px;
             text-align: center;
             position: relative;
             z-index: 1;
@@ -142,6 +142,19 @@
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .debug-btn {
+            width: 100%;
+            padding: 10px;
+            background: #666;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin: 5px 0;
         }
         
         .login-btn:hover {
@@ -167,6 +180,9 @@
             text-align: center;
             opacity: 0;
             transition: opacity 0.3s ease;
+            max-height: 200px;
+            overflow-y: auto;
+            word-break: break-word;
         }
         
         .error-message.show {
@@ -184,6 +200,18 @@
         
         .success-message.show {
             opacity: 1;
+        }
+        
+        .debug-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #ccc;
         }
         
         .loading-spinner {
@@ -236,7 +264,7 @@
     <div class="login-container">
         <h1 class="logo">Mavire Codoir</h1>
         <p class="subtitle">NFT Minting System</p>
-        <p class="api-notice">Enter your Vercel API token to access the dashboard</p>
+        <p class="api-notice">Debug Mode - Testing API Endpoints</p>
         
         <form id="loginForm">
             <div class="form-group">
@@ -255,20 +283,111 @@
             </div>
             
             <button type="submit" class="login-btn" id="loginButton">
-                <span id="buttonText">Access Dashboard</span>
+                <span id="buttonText">Test Vercel Login</span>
                 <div class="loading-spinner" id="loadingSpinner"></div>
+            </button>
+            
+            <button type="button" class="debug-btn" onclick="testEndpoints()">
+                🔍 Test All Endpoints
+            </button>
+            
+            <button type="button" class="debug-btn" onclick="tryOriginalLogin()">
+                🔑 Try Original Login
             </button>
             
             <div class="error-message" id="errorMessage"></div>
             <div class="success-message" id="successMessage"></div>
+            
+            <div class="debug-info" id="debugInfo" style="display: none;">
+                <strong>Debug Information:</strong><br>
+                <div id="debugContent"></div>
+            </div>
         </form>
         
         <p class="brand-tagline">
-            Authenticated access to luxury sustainable fashion management
+            Debug version - Testing authentication endpoints
         </p>
     </div>
 
     <script>
+        function showDebug(info) {
+            const debugInfo = document.getElementById('debugInfo');
+            const debugContent = document.getElementById('debugContent');
+            debugContent.innerHTML = info;
+            debugInfo.style.display = 'block';
+        }
+        
+        async function testEndpoints() {
+            const debugContent = document.getElementById('debugContent');
+            debugContent.innerHTML = 'Testing endpoints...<br>';
+            
+            const endpoints = [
+                '/api/admin/status',
+                '/api/admin/login',
+                '/api/admin/login-vercel',
+                '/health',
+                '/api/debug/environment'
+            ];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const contentType = response.headers.get('content-type');
+                    let result = '';
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        result = `✅ ${endpoint}: ${response.status} (JSON) - ${JSON.stringify(data).substring(0, 100)}...`;
+                    } else {
+                        const text = await response.text();
+                        result = `❌ ${endpoint}: ${response.status} (${contentType}) - ${text.substring(0, 100)}...`;
+                    }
+                    
+                    debugContent.innerHTML += result + '<br>';
+                } catch (error) {
+                    debugContent.innerHTML += `❌ ${endpoint}: ERROR - ${error.message}<br>`;
+                }
+            }
+            
+            document.getElementById('debugInfo').style.display = 'block';
+        }
+        
+        async function tryOriginalLogin() {
+            const token = document.getElementById('accessToken').value;
+            if (!token) {
+                alert('Please enter a token first');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token })
+                });
+                
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    showDebug(`Original login endpoint response:<br>Status: ${response.status}<br>Data: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const text = await response.text();
+                    showDebug(`Original login endpoint returned HTML:<br>Status: ${response.status}<br>Content: ${text.substring(0, 500)}...`);
+                }
+            } catch (error) {
+                showDebug(`Original login endpoint error:<br>${error.message}`);
+            }
+        }
+        
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -289,6 +408,9 @@
             spinner.style.display = 'block';
             
             try {
+                console.log('Attempting login with endpoint: /api/admin/login-vercel');
+                console.log('Token length:', token.length);
+                
                 // Use the Vercel token login endpoint
                 const response = await fetch('/api/admin/login-vercel', {
                     method: 'POST',
@@ -298,29 +420,59 @@
                     body: JSON.stringify({ token })
                 });
                 
-                const data = await response.json();
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
                 
-                if (response.ok && data.success) {
-                    // Show success message
-                    successMessage.textContent = 'Authentication successful! Redirecting...';
-                    successMessage.classList.add('show');
+                const contentType = response.headers.get('content-type');
+                console.log('Content type:', contentType);
+                
+                let debugInfo = `Request Details:<br>`;
+                debugInfo += `- URL: ${window.location.origin}/api/admin/login-vercel<br>`;
+                debugInfo += `- Method: POST<br>`;
+                debugInfo += `- Status: ${response.status}<br>`;
+                debugInfo += `- Content-Type: ${contentType}<br>`;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    console.log('Response data:', data);
                     
-                    // Store session token and redirect to admin dashboard
-                    localStorage.setItem('admin_session_token', data.sessionId);
+                    debugInfo += `- Response: ${JSON.stringify(data, null, 2)}<br>`;
                     
-                    // Redirect after a short delay
-                    setTimeout(() => {
-                        window.location.href = '/admin';
-                    }, 1500);
+                    if (response.ok && data.success) {
+                        successMessage.textContent = 'Authentication successful! Redirecting...';
+                        successMessage.classList.add('show');
+                        
+                        localStorage.setItem('admin_session_token', data.sessionId);
+                        
+                        setTimeout(() => {
+                            window.location.href = '/admin';
+                        }, 1500);
+                    } else {
+                        throw new Error(data.message || data.error || 'Authentication failed');
+                    }
                 } else {
-                    throw new Error(data.message || data.error || 'Authentication failed');
+                    // Not JSON response - likely HTML error page
+                    const text = await response.text();
+                    console.log('HTML response:', text.substring(0, 200));
+                    
+                    debugInfo += `- HTML Response (first 500 chars): ${text.substring(0, 500)}<br>`;
+                    
+                    if (text.includes('<!DOCTYPE')) {
+                        throw new Error('API endpoint returned HTML page instead of JSON. The endpoint may not exist or there\'s a routing issue.');
+                    } else {
+                        throw new Error('Invalid response format: ' + text.substring(0, 100));
+                    }
                 }
+                
+                showDebug(debugInfo);
+                
             } catch (error) {
                 console.error('Login error:', error);
                 
-                // Show detailed error message
                 let errorText = 'Authentication failed. ';
-                if (error.message.includes('Invalid Vercel API token')) {
+                if (error.message.includes('HTML page instead of JSON')) {
+                    errorText += 'The login endpoint is not working. This suggests the new endpoint wasn\'t deployed properly.';
+                } else if (error.message.includes('Invalid Vercel API token')) {
                     errorText += 'Please check your Vercel API token and try again.';
                 } else if (error.message.includes('network') || error.message.includes('fetch')) {
                     errorText += 'Network error. Please check your connection.';
@@ -328,18 +480,12 @@
                     errorText += error.message || 'Please try again.';
                 }
                 
-                errorMessage.textContent = errorText;
+                errorMessage.innerHTML = errorText;
                 errorMessage.classList.add('show');
                 
-                // Clear the input
-                document.getElementById('accessToken').value = '';
+                // Show debug info
+                showDebug(`Error Details:<br>${error.message}<br><br>This suggests the API endpoint is not properly configured.`);
                 
-                // Shake animation
-                const container = document.querySelector('.login-container');
-                container.style.animation = 'shake 0.5s ease-in-out';
-                setTimeout(() => {
-                    container.style.animation = '';
-                }, 500);
             } finally {
                 // Reset button state
                 button.disabled = false;
@@ -348,42 +494,10 @@
             }
         });
         
-        // Add shake animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-10px); }
-                75% { transform: translateX(10px); }
-            }
-        `;
-        document.head.appendChild(style);
-        
         // Focus on input when page loads
         window.addEventListener('load', () => {
             document.getElementById('accessToken').focus();
         });
-        
-        // Check if already logged in
-        const existingSession = localStorage.getItem('admin_session_token');
-        if (existingSession) {
-            // Verify session is still valid before redirecting
-            fetch('/api/admin/status', {
-                headers: {
-                    'Authorization': `Bearer ${existingSession}`
-                }
-            }).then(response => {
-                if (response.ok) {
-                    window.location.href = '/admin';
-                } else {
-                    // Session invalid, clear it
-                    localStorage.removeItem('admin_session_token');
-                }
-            }).catch(() => {
-                // Network error or session invalid
-                localStorage.removeItem('admin_session_token');
-            });
-        }
     </script>
 </body>
 </html>
