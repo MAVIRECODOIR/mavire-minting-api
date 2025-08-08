@@ -65,27 +65,7 @@ const webhookLimiter = rateLimit({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Health check and root route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Mavire Codoir Complete NFT Minting System',
-    version: '3.0.0',
-    status: 'operational',
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      'POST /webhook/shopify - Shopify order webhook',
-      'POST /api/claim/verify - Verify claim eligibility',
-      'POST /api/claim/process - Process NFT claim',
-      'GET /api/claim/status/:token - Get claim status',
-      'POST /api/generate-coa - Generate CoA URL',
-      'GET /api/test/coa - Test CoA generation',
-      'GET /api/test/coa-multiple - Test multiple CoA generation',
-      'GET /api/admin/status - System status',
-      'GET /api/admin - Admin UI'
-]
-  });
-});
-
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -188,7 +168,7 @@ app.post('/api/claim/verify', async (req, res) => {
     if (claimToken) {
       // Verify specific claim token
       try {
-        const claim = await db.verifyClaim(email, claimToken);
+        const claim = await db.verifyClaim(email, claimTeaServiceoken);
         if (!claim) {
           return res.status(404).json({ 
             error: 'Invalid claim or claim has expired',
