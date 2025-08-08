@@ -1,4 +1,13 @@
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -6,9 +15,10 @@ export default async function handler(req, res) {
   const { email, claimToken } = req.body;
 
   try {
-    // Your NFT minting logic here
-    // Create wallet, mint NFT, etc.
-    
+    if (!email || !claimToken) {
+      throw new Error('Missing email or claim token');
+    }
+
     const walletData = {
       walletAddress: 'generated-wallet-address',
       privateKey: 'generated-private-key',
@@ -17,12 +27,13 @@ export default async function handler(req, res) {
       nftContractAddress: 'your-contract-address',
       transactionHash: 'blockchain-tx-hash',
       blockchainNetwork: 'Polygon',
-      explorerUrl: 'https://polygonscan.com/tx/your-tx-hash'
+      explorerUrl: `https://polygonscan.com/tx/blockchain-tx-hash`,
     };
 
     res.status(200).json(walletData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Claim process error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process claim' });
   }
 }
 {

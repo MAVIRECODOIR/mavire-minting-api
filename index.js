@@ -74,8 +74,8 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: [
       'POST /webhook/shopify - Shopify order webhook',
-      'POST /api/claim/verify - Verify claim eligibility', 
-      'POST /api/claim/process - Process NFT claim',
+      'POST /api/verify-claim - Verify claim eligibility',
+      'POST /api/process - Process NFT claim',
       'GET /api/claim/status/:token - Get claim status',
       'POST /api/generate-coa - Generate CoA URL',
       'GET /api/test/coa - Test CoA generation',
