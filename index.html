@@ -220,12 +220,12 @@
         
         <form id="loginForm">
             <div class="form-group">
-                <label for="vercelToken">Vercel API Token</label>
+                <label for="accessToken">Admin Access Token</label>
                 <input 
                     type="password" 
-                    id="vercelToken" 
-                    name="vercelToken" 
-                    placeholder="Enter your Vercel API token"
+                    id="accessToken" 
+                    name="accessToken" 
+                    placeholder="Enter your admin access token"
                     required
                     autocomplete="off"
                 >
@@ -248,7 +248,7 @@
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const token = document.getElementById('vercelToken').value;
+            const token = document.getElementById('accessToken').value;
             const button = document.getElementById('loginButton');
             const buttonText = document.getElementById('buttonText');
             const spinner = document.getElementById('loadingSpinner');
@@ -272,20 +272,20 @@
                     }
                 });
                 
-                if (response.ok) {
-                    // Store the token and redirect to admin portal
-                    localStorage.setItem('vercel_api_token', token);
-                    window.location.href = '/api/admin';
+                if (response.ok && data.success) {
+                    // Store session token and redirect to your existing admin page
+                    localStorage.setItem('admin_session_token', data.sessionId);
+                    window.location.href = '/admin';
                 } else {
-                    throw new Error('Invalid Vercel API token or server error');
+                    throw new Error(data.message || 'Authentication failed');
                 }
             } catch (error) {
                 // Show error message
-                errorMessage.textContent = 'Invalid Vercel API token. Please check your token and try again.';
+                errorMessage.textContent = 'Invalid access token. Please check your token and try again.';
                 errorMessage.classList.add('show');
                 
                 // Clear the input
-                document.getElementById('vercelToken').value = '';
+                document.getElementById('accessToken').value = '';
                 
                 // Shake animation
                 const container = document.querySelector('.login-container');
@@ -314,12 +314,12 @@
         
         // Focus on input when page loads
         window.addEventListener('load', () => {
-            document.getElementById('vercelToken').focus();
+            document.getElementById('accessToken').focus();
         });
         
         // Check if already logged in
-        if (localStorage.getItem('vercel_api_token')) {
-            window.location.href = '/api/admin';
+        if (localStorage.getItem('admin_session_token')) {
+            window.location.href = '/admin';
         }
     </script>
 </body>
