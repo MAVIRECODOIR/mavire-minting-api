@@ -25,3 +25,16 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+{
+{
+  "wallet": {
+    "address": "0x...",
+    "privateKey": "0x...",
+    "mnemonic": "word1 word2..."
+  },
+  "nft": {
+    "tokenId": "42",
+    "transactionHash": "0x...",
+    "contractAddress": "0x..."
+  }
+}
