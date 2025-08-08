@@ -173,6 +173,19 @@
             opacity: 1;
         }
         
+        .success-message {
+            color: #51cf66;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .success-message.show {
+            opacity: 1;
+        }
+        
         .loading-spinner {
             display: none;
             width: 20px;
@@ -198,6 +211,13 @@
             padding-top: 20px;
         }
         
+        .helper-text {
+            margin-top: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.75rem;
+            text-align: left;
+        }
+        
         @media (max-width: 480px) {
             .login-container {
                 margin: 20px;
@@ -216,19 +236,22 @@
     <div class="login-container">
         <h1 class="logo">Mavire Codoir</h1>
         <p class="subtitle">NFT Minting System</p>
-        <p class="api-notice">This is a private API. Please use the designated endpoints.</p>
+        <p class="api-notice">Enter your Vercel API token to access the dashboard</p>
         
         <form id="loginForm">
             <div class="form-group">
-                <label for="accessToken">Admin Access Token</label>
+                <label for="accessToken">Vercel API Token</label>
                 <input 
                     type="password" 
                     id="accessToken" 
                     name="accessToken" 
-                    placeholder="Enter your admin access token"
+                    placeholder="Enter your Vercel API token"
                     required
                     autocomplete="off"
                 >
+                <div class="helper-text">
+                    Get your token from: vercel.com/account/tokens
+                </div>
             </div>
             
             <button type="submit" class="login-btn" id="loginButton">
@@ -237,6 +260,7 @@
             </button>
             
             <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
         </form>
         
         <p class="brand-tagline">
@@ -253,9 +277,11 @@
             const buttonText = document.getElementById('buttonText');
             const spinner = document.getElementById('loadingSpinner');
             const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
             
-            // Reset error state
+            // Reset message states
             errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
             
             // Show loading state
             button.disabled = true;
@@ -263,25 +289,46 @@
             spinner.style.display = 'block';
             
             try {
-                // Test the token by calling the status endpoint
-                const response = await fetch('/api/admin/status', {
-                    method: 'GET',
+                // Use the Vercel token login endpoint
+                const response = await fetch('/api/admin/login-vercel', {
+                    method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token })
                 });
                 
+                const data = await response.json();
+                
                 if (response.ok && data.success) {
-                    // Store session token and redirect to your existing admin page
+                    // Show success message
+                    successMessage.textContent = 'Authentication successful! Redirecting...';
+                    successMessage.classList.add('show');
+                    
+                    // Store session token and redirect to admin dashboard
                     localStorage.setItem('admin_session_token', data.sessionId);
-                    window.location.href = '/admin';
+                    
+                    // Redirect after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 1500);
                 } else {
-                    throw new Error(data.message || 'Authentication failed');
+                    throw new Error(data.message || data.error || 'Authentication failed');
                 }
             } catch (error) {
-                // Show error message
-                errorMessage.textContent = 'Invalid access token. Please check your token and try again.';
+                console.error('Login error:', error);
+                
+                // Show detailed error message
+                let errorText = 'Authentication failed. ';
+                if (error.message.includes('Invalid Vercel API token')) {
+                    errorText += 'Please check your Vercel API token and try again.';
+                } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                    errorText += 'Network error. Please check your connection.';
+                } else {
+                    errorText += error.message || 'Please try again.';
+                }
+                
+                errorMessage.textContent = errorText;
                 errorMessage.classList.add('show');
                 
                 // Clear the input
@@ -318,8 +365,24 @@
         });
         
         // Check if already logged in
-        if (localStorage.getItem('admin_session_token')) {
-            window.location.href = '/admin';
+        const existingSession = localStorage.getItem('admin_session_token');
+        if (existingSession) {
+            // Verify session is still valid before redirecting
+            fetch('/api/admin/status', {
+                headers: {
+                    'Authorization': `Bearer ${existingSession}`
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.href = '/admin';
+                } else {
+                    // Session invalid, clear it
+                    localStorage.removeItem('admin_session_token');
+                }
+            }).catch(() => {
+                // Network error or session invalid
+                localStorage.removeItem('admin_session_token');
+            });
         }
     </script>
 </body>
