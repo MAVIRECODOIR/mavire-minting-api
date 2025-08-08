@@ -17,21 +17,18 @@ export default async function handler(req, res) {
   const { email, claimToken } = req.body;
 
   try {
-    // TODO: Implement actual Shopify order verification
-    // Check if claimToken exists and matches email in your database
-    // Example: Query Shopify API or database for order details
     if (!email || !claimToken) {
       throw new Error('Missing email or claim token');
     }
 
-    // Mock response for testing
+    // TODO: Implement Shopify order verification
+    // Example: Query Shopify API or database for order by email/claimToken
     const orderData = {
-      order: {
-        orderNumber: '12345',
-        productName: 'Mavire Product',
-        customerName: 'Customer Name',
-        createdAt: new Date().toISOString(),
-      },
+      orderId: 'found-order-id',
+      productName: 'Product name from Shopify',
+      customerName: 'Customer name',
+      orderDate: new Date().toISOString(),
+      price: 'Order price',
     };
 
     res.status(200).json(orderData);
