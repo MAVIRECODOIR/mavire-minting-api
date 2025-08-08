@@ -6,6 +6,7 @@ const { ThirdwebSDK } = require('@thirdweb-dev/sdk');
 const { v4: uuidv4 } = require('uuid');
 const Joi = require('joi');
 const crypto = require('crypto');
+const path = require('path');
 
 const CloudinaryCoAGenerator = require('./cloudinaryCoAGenerator');
 const DatabaseService = require('./databaseService');
@@ -99,6 +100,31 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
+// ROOT ROUTE - Serve the original admin.html content
+app.get('/', (req, res) => {
+  const originalHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Mavire Codoir</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #333; }
+        p { color: #666; }
+      </style>
+    </head>
+    <body>
+      <h1>Mavire Codoir NFT Minting System</h1>
+      <p>This is a private API. Please use the designated endpoints.</p>
+    </body>
+    </html>
+  `;
+  
+  res.send(originalHtml);
+});
+
 // Admin login endpoint
 app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
   try {
@@ -109,10 +135,18 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
     }
     
     // Verify against Vercel token (set in environment variables)
-    const expectedToken = process.env.ADMIN_ACCESS_TOKEN || 'mavire-admin-2024';
+    const expectedToken = process.env.ADMIN_ACCESS_TOKEN;
+    
+    if (!expectedToken) {
+      console.error('❌ ADMIN_ACCESS_TOKEN not set in environment variables');
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'Admin access not configured'
+      });
+    }
     
     if (token !== expectedToken) {
-      console.warn('🚨 Invalid admin login attempt:', req.ip);
+      console.warn('🚨 Invalid admin login attempt from:', req.ip);
       return res.status(401).json({ 
         error: 'Invalid access token',
         message: 'Access denied'
@@ -129,7 +163,7 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
       ip: req.ip
     });
     
-    console.log('✅ Admin login successful:', req.ip);
+    console.log('✅ Admin login successful from:', req.ip);
     
     res.json({
       success: true,
@@ -150,30 +184,21 @@ app.post('/api/admin/logout', (req, res) => {
   
   if (sessionId && adminSessions.has(sessionId)) {
     adminSessions.delete(sessionId);
+    console.log('👋 Admin logged out');
   }
   
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Admin login page (serves the HTML interface)
+// ADMIN DASHBOARD ROUTE - Secure login page with dashboard
 app.get('/admin', (req, res) => {
-  const loginHtml = `
+  const adminDashboardHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Mavire Codoir - Admin Access</title>
+      <title>Mavire Codoir - Admin Dashboard</title>
       <style>
         * {
           margin: 0;
@@ -191,16 +216,27 @@ app.get('/admin', (req, res) => {
           color: #333;
         }
         
-        .login-container {
+        .container {
           background: rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(10px);
           border-radius: 20px;
           padding: 3rem;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
           border: 1px solid rgba(255, 255, 255, 0.2);
-          max-width: 400px;
+          max-width: 500px;
           width: 100%;
           text-align: center;
+        }
+        
+        .dashboard-container {
+          max-width: 1200px;
+          width: 95%;
+          margin: 2rem auto;
+          padding: 2rem;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
         
         .brand-logo {
@@ -230,7 +266,7 @@ app.get('/admin', (req, res) => {
           color: #555;
         }
         
-        input[type="password"] {
+        input[type="password"], input[type="email"] {
           width: 100%;
           padding: 1rem;
           border: 2px solid #e1e5e9;
@@ -240,13 +276,13 @@ app.get('/admin', (req, res) => {
           background: rgba(255, 255, 255, 0.8);
         }
         
-        input[type="password"]:focus {
+        input[type="password"]:focus, input[type="email"]:focus {
           outline: none;
           border-color: #667eea;
           box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
-        .login-btn {
+        .btn {
           width: 100%;
           padding: 1rem;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -260,15 +296,22 @@ app.get('/admin', (req, res) => {
           margin-bottom: 1rem;
         }
         
-        .login-btn:hover {
+        .btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
         
-        .login-btn:disabled {
+        .btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
           transform: none;
+        }
+        
+        .btn-secondary {
+          background: #6c757d;
+          width: auto;
+          padding: 0.5rem 1rem;
+          margin: 0.5rem;
         }
         
         .error-message {
@@ -289,20 +332,17 @@ app.get('/admin', (req, res) => {
           font-size: 0.9rem;
         }
         
-        .security-notice {
-          font-size: 0.8rem;
-          color: #888;
-          margin-top: 1rem;
-          text-align: center;
-        }
-        
         .dashboard {
           display: none;
-          padding: 2rem 0;
         }
         
         .dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
           margin-bottom: 2rem;
+          padding-bottom: 1rem;
+          border-bottom: 2px solid #e1e5e9;
         }
         
         .dashboard-nav {
@@ -325,77 +365,193 @@ app.get('/admin', (req, res) => {
           font-weight: 500;
         }
         
-        .nav-button:hover {
+        .nav-button:hover, .nav-button.active {
           border-color: #667eea;
           background: #f8f9ff;
+          transform: translateY(-2px);
         }
         
         .logout-btn {
-          background: #ff6b6b;
+          background: #dc3545;
           color: white;
           border: none;
           padding: 0.5rem 1rem;
-          border-radius: 5px;
+          border-radius: 8px;
           cursor: pointer;
-          float: right;
+          font-size: 0.9rem;
         }
         
         .content-area {
           background: white;
           border-radius: 10px;
-          padding: 1.5rem;
+          padding: 2rem;
           min-height: 400px;
           border: 1px solid #e1e5e9;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
         
-        @media (max-width: 480px) {
-          .login-container {
+        .status-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 1rem;
+          margin-bottom: 2rem;
+        }
+        
+        .status-card {
+          background: #f8f9fa;
+          padding: 1.5rem;
+          border-radius: 10px;
+          border-left: 4px solid #667eea;
+        }
+        
+        .status-card.healthy {
+          border-left-color: #28a745;
+        }
+        
+        .status-card.error {
+          border-left-color: #dc3545;
+        }
+        
+        .status-card h4 {
+          margin-bottom: 0.5rem;
+          color: #333;
+        }
+        
+        .status-card .status {
+          font-weight: bold;
+          text-transform: uppercase;
+          font-size: 0.9rem;
+        }
+        
+        .status.healthy {
+          color: #28a745;
+        }
+        
+        .status.error {
+          color: #dc3545;
+        }
+        
+        .status.unknown {
+          color: #ffc107;
+        }
+        
+        pre {
+          background: #f8f9fa;
+          padding: 1.5rem;
+          border-radius: 8px;
+          overflow-x: auto;
+          border: 1px solid #e9ecef;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+        
+        .email-test-form {
+          background: #f8f9fa;
+          padding: 1.5rem;
+          border-radius: 10px;
+          margin-bottom: 1.5rem;
+        }
+        
+        .form-row {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          align-items: end;
+        }
+        
+        .form-col {
+          flex: 1;
+        }
+        
+        select {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid #e1e5e9;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          background: white;
+        }
+        
+        .loading {
+          text-align: center;
+          padding: 2rem;
+          color: #666;
+        }
+        
+        .security-notice {
+          font-size: 0.8rem;
+          color: #888;
+          margin-top: 1rem;
+          text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+          .container, .dashboard-container {
             margin: 1rem;
-            padding: 2rem;
+            padding: 1.5rem;
+          }
+          
+          .dashboard-header {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+          }
+          
+          .form-row {
+            flex-direction: column;
+          }
+          
+          .dashboard-nav {
+            grid-template-columns: 1fr;
           }
         }
       </style>
     </head>
     <body>
-      <div class="login-container">
-        <div id="loginForm">
-          <div class="brand-logo">Mavire Codoir</div>
-          <div class="subtitle">Admin Dashboard Access</div>
-          
-          <div id="messageArea"></div>
-          
-          <form id="authForm">
-            <div class="form-group">
-              <label for="accessToken">Access Token</label>
-              <input type="password" id="accessToken" placeholder="Enter your admin token" required>
-            </div>
-            
-            <button type="submit" class="login-btn" id="loginBtn">
-              Access Dashboard
-            </button>
-          </form>
-          
-          <div class="security-notice">
-            🔒 Secure access required • Luxury sustainable fashion NFTs
+      <!-- Login Form -->
+      <div id="loginContainer" class="container">
+        <div class="brand-logo">Mavire Codoir</div>
+        <div class="subtitle">Admin Dashboard Access</div>
+        
+        <div id="messageArea"></div>
+        
+        <form id="authForm">
+          <div class="form-group">
+            <label for="accessToken">Access Token</label>
+            <input type="password" id="accessToken" placeholder="Enter your Vercel admin token" required>
           </div>
+          
+          <button type="submit" class="btn" id="loginBtn">
+            Access Dashboard
+          </button>
+        </form>
+        
+        <div class="security-notice">
+          🔒 Secure access required • Luxury sustainable fashion NFTs
+        </div>
+      </div>
+      
+      <!-- Admin Dashboard -->
+      <div id="dashboardContainer" class="dashboard-container dashboard">
+        <div class="dashboard-header">
+          <h2>🎨 Mavire Codoir Admin Dashboard</h2>
+          <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
         
-        <div id="adminDashboard" class="dashboard">
-          <div class="dashboard-header">
-            <h2>Admin Dashboard</h2>
-            <button class="logout-btn" onclick="logout()">Logout</button>
-          </div>
-          
-          <div class="dashboard-nav">
-            <button class="nav-button" onclick="loadSection('status')">System Status</button>
-            <button class="nav-button" onclick="loadSection('environment')">Environment Check</button>
-            <button class="nav-button" onclick="loadSection('email')">Test Email</button>
-            <button class="nav-button" onclick="loadSection('coa')">Test CoA Generator</button>
-            <button class="nav-button" onclick="loadSection('tokens')">Graph Token Test</button>
-          </div>
-          
-          <div class="content-area" id="contentArea">
-            <p>Welcome to the Mavire Codoir Admin Dashboard. Select a section above to get started.</p>
+        <div class="dashboard-nav">
+          <button class="nav-button" onclick="loadSection('status')">📊 System Status</button>
+          <button class="nav-button" onclick="loadSection('environment')">🔧 Environment Check</button>
+          <button class="nav-button" onclick="loadSection('email')">📧 Email Testing</button>
+          <button class="nav-button" onclick="loadSection('coa')">🎨 CoA Generator</button>
+          <button class="nav-button" onclick="loadSection('tokens')">🔑 Token Test</button>
+        </div>
+        
+        <div class="content-area" id="contentArea">
+          <div style="text-align: center; padding: 3rem;">
+            <h3>Welcome to Mavire Codoir Admin Dashboard</h3>
+            <p>Select a section above to get started managing your luxury sustainable fashion NFT system.</p>
+            <br>
+            <p style="color: #666;">All admin functions are now accessible through this secure interface.</p>
           </div>
         </div>
       </div>
@@ -403,7 +559,9 @@ app.get('/admin', (req, res) => {
       <script>
         // ${Buffer.from(`
         let currentSession = null;
+        let activeSection = null;
         
+        // Login form handler
         document.getElementById('authForm').addEventListener('submit', async (e) => {
           e.preventDefault();
           
@@ -435,14 +593,15 @@ app.get('/admin', (req, res) => {
               showMessage('Authentication successful! Loading dashboard...', 'success');
               
               setTimeout(() => {
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('adminDashboard').style.display = 'block';
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('dashboardContainer').style.display = 'block';
                 loadSection('status');
               }, 1000);
             } else {
               showMessage(data.message || 'Authentication failed', 'error');
             }
           } catch (error) {
+            console.error('Login error:', error);
             showMessage('Connection error. Please try again.', 'error');
           } finally {
             loginBtn.disabled = false;
@@ -453,8 +612,13 @@ app.get('/admin', (req, res) => {
         function showMessage(message, type) {
           const messageArea = document.getElementById('messageArea');
           messageArea.innerHTML = \`<div class="\${type}-message">\${message}</div>\`;
+          
+          setTimeout(() => {
+            messageArea.innerHTML = '';
+          }, 5000);
         }
         
+        // API helper functions
         async function apiCall(endpoint) {
           try {
             const response = await fetch(endpoint, {
@@ -464,7 +628,7 @@ app.get('/admin', (req, res) => {
             });
             return await response.json();
           } catch (error) {
-            return { error: 'Failed to connect to API' };
+            return { error: 'Failed to connect to API', details: error.message };
           }
         }
         
@@ -480,80 +644,179 @@ app.get('/admin', (req, res) => {
             });
             return await response.json();
           } catch (error) {
-            return { error: 'Failed to connect to API' };
+            return { error: 'Failed to connect to API', details: error.message };
           }
         }
         
+        // Dashboard section loader
         async function loadSection(section) {
           const contentArea = document.getElementById('contentArea');
-          contentArea.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading...</div>';
+          const navButtons = document.querySelectorAll('.nav-button');
           
-          switch (section) {
-            case 'status':
-              const status = await apiCall('/api/admin/status');
-              contentArea.innerHTML = \`
-                <h3>System Status</h3>
-                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(status, null, 2)}</pre>
-              \`;
-              break;
-              
-            case 'environment':
-              const env = await apiCall('/api/debug/environment');
-              contentArea.innerHTML = \`
-                <h3>Environment Check</h3>
-                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(env, null, 2)}</pre>
-              \`;
-              break;
-              
-            case 'email':
-              contentArea.innerHTML = \`
-                <h3>Email Service Test</h3>
-                <div style="margin-bottom: 1rem;">
-                  <input type="email" id="testEmail" placeholder="test@example.com" style="padding: 0.5rem; margin-right: 1rem; border: 1px solid #ddd; border-radius: 5px;">
-                  <select id="emailType" style="padding: 0.5rem; margin-right: 1rem; border: 1px solid #ddd; border-radius: 5px;">
+          // Update active nav button
+          navButtons.forEach(btn => btn.classList.remove('active'));
+          event?.target?.classList.add('active');
+          
+          contentArea.innerHTML = '<div class="loading">Loading...</div>';
+          activeSection = section;
+          
+          try {
+            switch (section) {
+              case 'status':
+                await loadSystemStatus();
+                break;
+              case 'environment':
+                await loadEnvironmentCheck();
+                break;
+              case 'email':
+                await loadEmailTesting();
+                break;
+              case 'coa':
+                await loadCoATests();
+                break;
+              case 'tokens':
+                await loadTokenTests();
+                break;
+              default:
+                contentArea.innerHTML = '<p>Section not found.</p>';
+            }
+          } catch (error) {
+            contentArea.innerHTML = \`<div class="error-message">Failed to load section: \${error.message}</div>\`;
+          }
+        }
+        
+        async function loadSystemStatus() {
+          const status = await apiCall('/api/admin/status');
+          const contentArea = document.getElementById('contentArea');
+          
+          if (status.error) {
+            contentArea.innerHTML = \`<div class="error-message">Error: \${status.error}</div>\`;
+            return;
+          }
+          
+          const services = status.services || {};
+          
+          contentArea.innerHTML = \`
+            <h3>🔍 System Status Overview</h3>
+            <div class="status-grid">
+              <div class="status-card \${services.database}">
+                <h4>Database Service</h4>
+                <div class="status \${services.database}">\${services.database || 'unknown'}</div>
+              </div>
+              <div class="status-card \${services.blockchain}">
+                <h4>Blockchain Service</h4>
+                <div class="status \${services.blockchain}">\${services.blockchain || 'unknown'}</div>
+              </div>
+              <div class="status-card \${services.email}">
+                <h4>Email Service</h4>
+                <div class="status \${services.email}">\${services.email || 'unknown'}</div>
+              </div>
+              <div class="status-card \${services.imageGeneration}">
+                <h4>Image Generation</h4>
+                <div class="status \${services.imageGeneration}">\${services.imageGeneration || 'unknown'}</div>
+              </div>
+            </div>
+            
+            <h4>📊 System Details</h4>
+            <pre>\${JSON.stringify(status, null, 2)}</pre>
+          \`;
+        }
+        
+        async function loadEnvironmentCheck() {
+          const env = await apiCall('/api/debug/environment');
+          const contentArea = document.getElementById('contentArea');
+          
+          contentArea.innerHTML = \`
+            <h3>🔧 Environment Variables Check</h3>
+            <p>This shows the status of all required environment variables for the system.</p>
+            <pre>\${JSON.stringify(env, null, 2)}</pre>
+          \`;
+        }
+        
+        async function loadEmailTesting() {
+          const contentArea = document.getElementById('contentArea');
+          
+          contentArea.innerHTML = \`
+            <h3>📧 Email Service Testing</h3>
+            <p>Test the email service by sending sample emails to verify configuration.</p>
+            
+            <div class="email-test-form">
+              <div class="form-row">
+                <div class="form-col">
+                  <label>Test Email Address:</label>
+                  <input type="email" id="testEmail" placeholder="test@example.com" value="test@example.com">
+                </div>
+                <div class="form-col">
+                  <label>Email Type:</label>
+                  <select id="emailType">
                     <option value="claim">Claim Email</option>
                     <option value="welcome">Welcome Email</option>
                   </select>
-                  <button onclick="testEmail()" style="padding: 0.5rem 1rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Send Test Email</button>
                 </div>
-                <div id="emailResult"></div>
-              \`;
-              break;
-              
-            case 'coa':
-              const coa = await apiCall('/api/test/coa');
-              const coaMultiple = await apiCall('/api/test/coa-multiple');
-              contentArea.innerHTML = \`
-                <h3>Certificate of Authenticity Tests</h3>
-                <h4>Single CoA Test:</h4>
-                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(coa, null, 2)}</pre>
-                <h4>Multiple CoA Test:</h4>
-                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(coaMultiple, null, 2)}</pre>
-              \`;
-              break;
-              
-            case 'tokens':
-              const tokens = await apiCall('/api/debug/graph-token');
-              contentArea.innerHTML = \`
-                <h3>Microsoft Graph Token Test</h3>
-                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(tokens, null, 2)}</pre>
-              \`;
-              break;
-              
-            default:
-              contentArea.innerHTML = '<p>Section not found.</p>';
-          }
+                <div class="form-col">
+                  <button class="btn" onclick="sendTestEmail()" style="width: auto; padding: 0.75rem 1.5rem;">Send Test Email</button>
+                </div>
+              </div>
+            </div>
+            
+            <div id="emailResult"></div>
+          \`;
         }
         
-        async function testEmail() {
+        async function loadCoATests() {
+          const contentArea = document.getElementById('contentArea');
+          contentArea.innerHTML = '<div class="loading">Loading CoA tests...</div>';
+          
+          const coa = await apiCall('/api/test/coa');
+          const coaMultiple = await apiCall('/api/test/coa-multiple');
+          
+          contentArea.innerHTML = \`
+            <h3>🎨 Certificate of Authenticity Tests</h3>
+            <p>Test the Cloudinary-based Certificate of Authenticity generation system.</p>
+            
+            <h4>📄 Single CoA Test Results:</h4>
+            <pre>\${JSON.stringify(coa, null, 2)}</pre>
+            
+            <h4>📄📄 Multiple CoA Test Results:</h4>
+            <pre>\${JSON.stringify(coaMultiple, null, 2)}</pre>
+          \`;
+        }
+        
+        async function loadTokenTests() {
+          const contentArea = document.getElementById('contentArea');
+          contentArea.innerHTML = '<div class="loading">Testing Microsoft Graph token...</div>';
+          
+          const tokens = await apiCall('/api/debug/graph-token');
+          
+          contentArea.innerHTML = \`
+            <h3>🔑 Microsoft Graph Token Test</h3>
+            <p>Test the Microsoft Graph authentication and token acquisition.</p>
+            <pre>\${JSON.stringify(tokens, null, 2)}</pre>
+          \`;
+        }
+        
+        async function sendTestEmail() {
           const email = document.getElementById('testEmail').value;
           const type = document.getElementById('emailType').value;
           const resultDiv = document.getElementById('emailResult');
           
-          resultDiv.innerHTML = 'Sending test email...';
+          if (!email) {
+            resultDiv.innerHTML = '<div class="error-message">Please enter an email address</div>';
+            return;
+          }
+          
+          resultDiv.innerHTML = '<div class="loading">Sending test email...</div>';
           
           const result = await apiPost('/api/test-email', { email, type });
-          resultDiv.innerHTML = \`<pre style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto;">\${JSON.stringify(result, null, 2)}</pre>\`;
+          
+          const resultClass = result.success ? 'success-message' : 'error-message';
+          resultDiv.innerHTML = \`
+            <div class="\${resultClass}">
+              \${result.success ? 'Email sent successfully!' : 'Email sending failed'}
+            </div>
+            <h4>📧 Email Test Results:</h4>
+            <pre>\${JSON.stringify(result, null, 2)}</pre>
+          \`;
         }
         
         async function logout() {
@@ -566,12 +829,30 @@ app.get('/admin', (req, res) => {
             });
           }
           
+          // Reset state
           currentSession = null;
-          document.getElementById('loginForm').style.display = 'block';
-          document.getElementById('adminDashboard').style.display = 'none';
+          activeSection = null;
+          
+          // Show login form
+          document.getElementById('loginContainer').style.display = 'block';
+          document.getElementById('dashboardContainer').style.display = 'none';
+          
+          // Clear form
           document.getElementById('accessToken').value = '';
           document.getElementById('messageArea').innerHTML = '';
+          
+          // Remove active nav states
+          document.querySelectorAll('.nav-button').forEach(btn => {
+            btn.classList.remove('active');
+          });
         }
+        
+        // Auto-refresh status every 30 seconds if on status page
+        setInterval(() => {
+          if (activeSection === 'status') {
+            loadSystemStatus();
+          }
+        }, 30000);
         `).toString('base64')}
         eval(atob(document.currentScript.textContent.split('base64')[1].split("'")[1]));
       </script>
@@ -579,10 +860,20 @@ app.get('/admin', (req, res) => {
     </html>
   `;
   
-  res.send(loginHtml);
+  res.send(adminDashboardHtml);
 });
 
-// Test email endpoint - add this to your index.js (PROTECTED)
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test email endpoint - PROTECTED
 app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   try {
     console.log('🧪 Testing email service...');
@@ -743,7 +1034,7 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   }
 });
 
-// Detailed environment check endpoint (PROTECTED)
+// Detailed environment check endpoint - PROTECTED
 app.get('/api/debug/environment', requireAdminAuth, (req, res) => {
   const envCheck = {
     requiredVars: {
@@ -769,6 +1060,13 @@ app.get('/api/debug/environment', requireAdminAuth, (req, res) => {
         isValid: process.env.FROM_EMAIL?.includes('@') || false
       },
       
+      // Admin access
+      ADMIN_ACCESS_TOKEN: {
+        present: !!process.env.ADMIN_ACCESS_TOKEN,
+        length: process.env.ADMIN_ACCESS_TOKEN?.length || 0,
+        format: 'Hidden for security'
+      },
+      
       // Other critical vars
       THIRDWEB_CLIENT_ID: {
         present: !!process.env.THIRDWEB_CLIENT_ID,
@@ -789,6 +1087,7 @@ app.get('/api/debug/environment', requireAdminAuth, (req, res) => {
     },
     
     emailServiceStatus: 'unknown',
+    adminAccessStatus: 'unknown',
     recommendations: []
   };
   
@@ -809,15 +1108,20 @@ app.get('/api/debug/environment', requireAdminAuth, (req, res) => {
     envCheck.recommendations.push('Set valid FROM_EMAIL address (customerservice@mavirecodoir.com)');
   }
   
+  if (!envCheck.requiredVars.ADMIN_ACCESS_TOKEN.present) {
+    envCheck.recommendations.push('Set ADMIN_ACCESS_TOKEN for secure admin access');
+  }
+  
   const allEmailVarsPresent = envCheck.requiredVars.MICROSOFT_CLIENT_ID.present && 
                               envCheck.requiredVars.MICROSOFT_CLIENT_SECRET.present && 
                               envCheck.requiredVars.MICROSOFT_TENANT_ID.present && 
                               envCheck.requiredVars.FROM_EMAIL.present;
                               
   envCheck.emailServiceStatus = allEmailVarsPresent ? 'Ready to test' : 'Missing configuration';
+  envCheck.adminAccessStatus = envCheck.requiredVars.ADMIN_ACCESS_TOKEN.present ? 'Configured' : 'Not configured';
   
   if (envCheck.recommendations.length === 0) {
-    envCheck.recommendations.push('All environment variables look good! Try testing email service.');
+    envCheck.recommendations.push('All environment variables look good! Try testing services.');
   }
   
   res.json({
@@ -827,7 +1131,7 @@ app.get('/api/debug/environment', requireAdminAuth, (req, res) => {
   });
 });
 
-// Microsoft Graph token test endpoint (PROTECTED)
+// Microsoft Graph token test endpoint - PROTECTED
 app.get('/api/debug/graph-token', requireAdminAuth, async (req, res) => {
   try {
     console.log('🔑 Testing Microsoft Graph token acquisition...');
@@ -1250,7 +1554,7 @@ app.post('/api/generate-coa', async (req, res) => {
   }
 });
 
-// Test Cloudinary endpoint (PROTECTED)
+// Test Cloudinary endpoint - PROTECTED
 app.get('/api/test/coa', requireAdminAuth, (req, res) => {
   try {
     console.log('🧪 Testing Cloudinary CoA generation...');
@@ -1272,7 +1576,7 @@ app.get('/api/test/coa', requireAdminAuth, (req, res) => {
   }
 });
 
-// Test multiple CoA variations (PROTECTED)
+// Test multiple CoA variations - PROTECTED
 app.get('/api/test/coa-multiple', requireAdminAuth, (req, res) => {
   try {
     console.log('🧪 Testing multiple Cloudinary CoA variations...');
@@ -1295,7 +1599,7 @@ app.get('/api/test/coa-multiple', requireAdminAuth, (req, res) => {
   }
 });
 
-// Admin endpoint to check system status (PROTECTED)
+// Admin endpoint to check system status - PROTECTED
 app.get('/api/admin/status', requireAdminAuth, async (req, res) => {
   try {
     const services = {
@@ -1339,10 +1643,11 @@ app.get('/api/admin/status', requireAdminAuth, async (req, res) => {
       status: 'operational',
       timestamp: new Date().toISOString(),
       services,
-      version: '3.1.0',
+      version: '3.2.0',
       uptime: process.uptime(),
       memory: process.memoryUsage(),
-      activeSessions: adminSessions.size
+      activeSessions: adminSessions.size,
+      environment: process.env.NODE_ENV || 'development'
     });
   } catch (error) {
     res.status(500).json({
@@ -1356,11 +1661,17 @@ app.get('/api/admin/status', requireAdminAuth, async (req, res) => {
 // Clean up expired sessions periodically
 setInterval(() => {
   const now = Date.now();
+  let cleanedCount = 0;
+  
   for (const [sessionId, session] of adminSessions.entries()) {
     if (session.expiresAt < now) {
       adminSessions.delete(sessionId);
-      console.log('🧹 Cleaned up expired admin session');
+      cleanedCount++;
     }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`🧹 Cleaned up ${cleanedCount} expired admin session(s)`);
   }
 }, 60000); // Check every minute
 
@@ -1381,14 +1692,16 @@ app.use((req, res) => {
     path: req.originalUrl,
     method: req.method,
     timestamp: new Date().toISOString(),
+    brand: 'Mavire Codoir NFT System',
     availableEndpoints: [
-      'GET /admin - Admin Dashboard',
-      'POST /webhook/shopify - Shopify Webhook',
-      'POST /api/claim/verify - Verify Claim',
-      'POST /api/claim/process - Process Claim', 
-      'GET /api/claim/status/:token - Claim Status',
-      'POST /api/generate-coa - Generate CoA',
-      'GET /health - Health Check'
+      'GET / - Main page',
+      'GET /admin - Admin Dashboard (requires authentication)',
+      'POST /webhook/shopify - Shopify webhook handler',
+      'POST /api/claim/verify - Verify NFT claim eligibility',
+      'POST /api/claim/process - Process NFT claim',
+      'GET /api/claim/status/:token - Check claim status',
+      'POST /api/generate-coa - Generate Certificate of Authenticity',
+      'GET /health - Health check'
     ]
   });
 });
@@ -1413,9 +1726,9 @@ module.exports = app;
 if (require.main === module) {
   app.listen(port, () => {
     console.log(`🚀 Mavire Codoir NFT Minting System running on port ${port}`);
+    console.log(`🏠 Main page: http://localhost:${port}/`);
     console.log(`🔐 Admin Dashboard: http://localhost:${port}/admin`);
-    console.log(`📊 System Status: http://localhost:${port}/api/admin/status`);
-    console.log(`🧪 CoA Test: http://localhost:${port}/api/test/coa`);
-    console.log(`💡 Remember to set ADMIN_ACCESS_TOKEN environment variable`);
+    console.log(`📊 Health Check: http://localhost:${port}/health`);
+    console.log(`💡 Admin token required: ${process.env.ADMIN_ACCESS_TOKEN ? 'Configured ✅' : 'Not set ❌'}`);
   });
 }
