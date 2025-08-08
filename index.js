@@ -125,31 +125,36 @@ app.get('/', (req, res) => {
   res.send(originalHtml);
 });
 
-// Admin login endpoint
-app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
+// Alternative admin login that validates Vercel API token
+app.post('/api/admin/login-vercel', adminLoginLimiter, async (req, res) => {
   try {
     const { token } = req.body;
     
     if (!token) {
-      return res.status(400).json({ error: 'Access token required' });
+      return res.status(400).json({ error: 'Vercel API token required' });
     }
     
-    // Verify against Vercel token (set in environment variables)
-    const expectedToken = process.env.ADMIN_ACCESS_TOKEN;
-    
-    if (!expectedToken) {
-      console.error('❌ ADMIN_ACCESS_TOKEN not set in environment variables');
-      return res.status(500).json({ 
-        error: 'Server configuration error',
-        message: 'Admin access not configured'
+    // Validate Vercel API token by making a test call to Vercel API
+    try {
+      const response = await fetch('https://api.vercel.com/v2/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-    }
-    
-    if (token !== expectedToken) {
-      console.warn('🚨 Invalid admin login attempt from:', req.ip);
+      
+      if (!response.ok) {
+        throw new Error('Invalid Vercel API token');
+      }
+      
+      const userData = await response.json();
+      console.log('✅ Verified Vercel user:', userData.user?.email || userData.email);
+      
+    } catch (error) {
+      console.warn('🚨 Invalid Vercel API token from:', req.ip);
       return res.status(401).json({ 
-        error: 'Invalid access token',
-        message: 'Access denied'
+        error: 'Invalid Vercel API token',
+        message: 'Please check your token and try again'
       });
     }
     
@@ -160,10 +165,11 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
     adminSessions.set(sessionId, {
       createdAt: Date.now(),
       expiresAt,
-      ip: req.ip
+      ip: req.ip,
+      vercelToken: token // Store the Vercel token for API calls
     });
     
-    console.log('✅ Admin login successful from:', req.ip);
+    console.log('✅ Vercel admin login successful from:', req.ip);
     
     res.json({
       success: true,
@@ -173,7 +179,7 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error('Vercel admin login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
 });
