@@ -4,7 +4,7 @@ const CryptoJS = require('crypto-js');
 class DatabaseService {
   constructor() {
     this.supabase = createClient(
-      process.env.SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,  // Fixed: matches your .env
       process.env.SUPABASE_SERVICE_KEY
     );
     this.encryptionKey = process.env.ENCRYPTION_KEY || 'mavire-default-key-change-in-production';
