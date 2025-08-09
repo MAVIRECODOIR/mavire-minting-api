@@ -878,6 +878,116 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Main minting API endpoint - matches your frontend
+app.post('/api/mint', async (req, res) => {
+  try {
+    const { email, claimToken } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        error: 'Email is required' 
+      });
+    }
+
+    console.log(`🔍 Mint API called - Email: ${email}, Token: ${claimToken || 'none'}`);
+
+    // CASE 1: User has a claim token - verify specific claim
+    if (claimToken) {
+      try {
+        const claim = await db.verifyClaim(email, claimToken);
+        
+        if (!claim) {
+          return res.json({
+            eligible: false,
+            message: 'Invalid or expired claim token'
+          });
+        }
+
+        // Claim is valid - ready to mint
+        return res.json({
+          eligible: true,
+          message: 'Valid claim found - ready to mint NFT',
+          claimData: {
+            orderId: claim.shopify_order_id,
+            productName: claim.orders?.product_name || 'NFT Product',
+            expiresAt: claim.expires_at,
+            orderNumber: claim.orders?.shopify_order_number
+          }
+        });
+      } catch (dbError) {
+        console.error('Database verification error:', dbError);
+        return res.json({
+          eligible: false,
+          message: 'Unable to verify claim - database connection issue'
+        });
+      }
+    }
+
+    // CASE 2: No claim token - check if email has eligible orders
+    try {
+      const orders = await db.getOrderByEmail(email);
+      console.log(`Found ${orders.length} NFT-eligible orders for ${email}`);
+
+      if (orders.length === 0) {
+        return res.json({
+          eligible: false,
+          message: 'No NFT-eligible orders found for this email address'
+        });
+      }
+
+      // Check which orders haven't been claimed yet
+      const eligibleOrders = [];
+      
+      for (const order of orders) {
+        const isClaimed = await db.isOrderClaimed(order.shopify_order_id);
+        
+        if (!isClaimed) {
+          eligibleOrders.push({
+            orderId: order.shopify_order_id,
+            orderNumber: order.shopify_order_number,
+            productName: order.product_name,
+            productSku: order.product_sku,
+            orderDate: order.created_at
+          });
+        }
+      }
+
+      if (eligibleOrders.length === 0) {
+        return res.json({
+          eligible: false,
+          message: 'All your NFT-eligible orders have already been claimed'
+        });
+      }
+
+      // User has unclaimed eligible orders
+      return res.json({
+        eligible: true,
+        message: `You have ${eligibleOrders.length} unclaimed NFT${eligibleOrders.length > 1 ? 's' : ''}`,
+        eligibleOrders: eligibleOrders,
+        nextStep: 'Check your email for claim links, or contact support if you need them resent'
+      });
+
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      
+      // If database fails, return helpful error instead of mock data
+      return res.json({
+        eligible: false,
+        message: 'Unable to check eligibility - database connection issue',
+        error: 'Please try again later or contact support'
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Minting API Error:', error);
+    
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: 'Database connection issue - please try again'
+    });
+  }
+});
+
 // Test email endpoint - PROTECTED
 app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   try {
