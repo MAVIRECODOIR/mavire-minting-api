@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
     console.log('🔍 Verifying claim:', { email, claimToken: claimToken.substring(0, 10) + '...' });
 
-    // ✅ FIXED: Query with correct column names from your schema
+    // Query with correct column names from your schema
     const { data: claim, error: claimError } = await supabase
       .from('claims')
       .select(`
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       `)
       .eq('claim_token', claimToken)
       .eq('customer_email', email)
-      .eq('claim_status', 'pending')  // ✅ FIXED: Use claim_status not status
+      .eq('claim_status', 'pending')
       .single();
 
     if (claimError || !claim) {
@@ -64,9 +64,9 @@ export default async function handler(req, res) {
 
     console.log('✅ Claim verified successfully');
 
-    // ✅ FIXED: Return format that ClaimPortal expects
+    // Return format that ClaimPortal expects
     res.status(200).json({
-      success: true,  // ClaimPortal checks for this
+      success: true,
       message: 'Claim verified successfully',
       claimId: claim.id,
       orderId: claim.orders?.shopify_order_id || claim.id,
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('💥 Verify claim error:', error);
     res.status(400).json({ 
-      success: false,  // ClaimPortal checks for this
+      success: false,
       error: error.message || 'Verification failed' 
     });
   }
