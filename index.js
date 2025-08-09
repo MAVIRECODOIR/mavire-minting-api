@@ -1623,18 +1623,245 @@ app.get('/api/admin/status', requireAdminAuth, async (req, res) => {
     }
 
     // Check blockchain health
-    try {
-      const sdk = ThirdwebSDK.fromPrivateKey(
-        process.env.THIRDWEB_PRIVATE_KEY,
-        process.env.THIRDWEB_CHAIN || "polygon",
-        { clientId: process.env.THIRDWEB_CLIENT_ID }
-      );
-      const contract = await sdk.getContract(process.env.THIRDWEB_CONTRACT_ADDRESS);
-      await contract.metadata.get();
-      services.blockchain = 'healthy';
-    } catch (error) {
-      services.blockchain = 'error';
+    // Replace your current blockchain health check in /api/admin/status with this enhanced version
+
+// Enhanced blockchain health check function
+async function checkBlockchainHealth() {
+  const result = {
+    status: 'unknown',
+    details: {},
+    errors: [],
+    recommendations: []
+  };
+
+  try {
+    // Check required environment variables first
+    const requiredVars = [
+      'THIRDWEB_CLIENT_ID',
+      'THIRDWEB_SECRET_KEY', 
+      'THIRDWEB_PRIVATE_KEY',
+      'THIRDWEB_CONTRACT_ADDRESS'
+    ];
+
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      result.status = 'error';
+      result.errors.push(`Missing environment variables: ${missingVars.join(', ')}`);
+      result.recommendations.push('Set missing environment variables in Vercel dashboard');
+      return result;
     }
+
+    result.details.environmentVars = {
+      clientId: !!process.env.THIRDWEB_CLIENT_ID,
+      secretKey: !!process.env.THIRDWEB_SECRET_KEY,
+      privateKey: !!process.env.THIRDWEB_PRIVATE_KEY,
+      contractAddress: !!process.env.THIRDWEB_CONTRACT_ADDRESS,
+      chain: process.env.THIRDWEB_CHAIN || 'polygon'
+    };
+
+    console.log('🔍 Testing ThirdWeb SDK initialization...');
+    
+    // Initialize SDK with more specific configuration
+    const sdk = ThirdwebSDK.fromPrivateKey(
+      process.env.THIRDWEB_PRIVATE_KEY,
+      process.env.THIRDWEB_CHAIN || "polygon",
+      { 
+        clientId: process.env.THIRDWEB_CLIENT_ID,
+        secretKey: process.env.THIRDWEB_SECRET_KEY,
+        // Add these for better error handling
+        gasless: false,
+        readOnlySettings: {
+          rpcUrl: process.env.THIRDWEB_CHAIN === 'polygon' ? 
+            'https://polygon-rpc.com/' : undefined
+        }
+      }
+    );
+
+    result.details.sdkInitialized = true;
+    console.log('✅ ThirdWeb SDK initialized successfully');
+
+    // Test contract connection
+    console.log('🔍 Testing contract connection...');
+    const contract = await sdk.getContract(process.env.THIRDWEB_CONTRACT_ADDRESS);
+    result.details.contractConnected = true;
+    console.log('✅ Contract connected successfully');
+
+    // Test contract metadata retrieval (less intensive than minting)
+    console.log('🔍 Testing contract metadata retrieval...');
+    const metadata = await contract.metadata.get();
+    result.details.contractMetadata = {
+      name: metadata.name,
+      symbol: metadata.symbol,
+      description: metadata.description?.substring(0, 100) + '...'
+    };
+    console.log('✅ Contract metadata retrieved successfully');
+
+    // Test wallet balance (to ensure private key is valid)
+    console.log('🔍 Testing wallet balance...');
+    const walletAddress = sdk.getSigner().address;
+    const balance = await sdk.getBalance();
+    result.details.wallet = {
+      address: walletAddress,
+      balance: balance.displayValue + ' ' + balance.symbol,
+      hasBalance: parseFloat(balance.displayValue) > 0
+    };
+
+    if (parseFloat(balance.displayValue) === 0) {
+      result.errors.push('Wallet has zero balance - may not be able to mint NFTs');
+      result.recommendations.push('Add MATIC to wallet: ' + walletAddress);
+    }
+
+    console.log('✅ Wallet balance checked successfully');
+
+    // If we get here, everything is working
+    result.status = 'healthy';
+    result.details.lastChecked = new Date().toISOString();
+
+  } catch (error) {
+    console.error('❌ Blockchain health check failed:', error);
+    
+    result.status = 'error';
+    result.errors.push(error.message);
+    
+    // Provide specific troubleshooting based on error type
+    if (error.message.includes('Invalid private key')) {
+      result.recommendations.push('Check THIRDWEB_PRIVATE_KEY format (should start with 0x)');
+    } else if (error.message.includes('Contract not found')) {
+      result.recommendations.push('Verify THIRDWEB_CONTRACT_ADDRESS is correct');
+      result.recommendations.push('Ensure contract is deployed on the specified chain');
+    } else if (error.message.includes('Network')) {
+      result.recommendations.push('Check network connectivity');
+      result.recommendations.push('Verify THIRDWEB_CHAIN is correct (polygon, ethereum, etc.)');
+    } else if (error.message.includes('Unauthorized') || error.message.includes('API key')) {
+      result.recommendations.push('Verify THIRDWEB_CLIENT_ID and THIRDWEB_SECRET_KEY');
+      result.recommendations.push('Check ThirdWeb dashboard for API key status');
+    } else {
+      result.recommendations.push('Check ThirdWeb service status');
+      result.recommendations.push('Verify all environment variables are correctly set');
+    }
+    
+    result.details.errorDetails = {
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+  }
+
+  return result;
+}
+
+// Update your admin status endpoint to use this enhanced check
+app.get('/api/admin/status', requireAdminAuth, async (req, res) => {
+  try {
+    const services = {
+      database: 'unknown',
+      blockchain: 'unknown',
+      imageGeneration: 'healthy',
+      email: 'unknown'
+    };
+
+    const serviceDetails = {};
+
+    // Check database health
+    try {
+      await db.supabase.from('orders').select('id').limit(1);
+      services.database = 'healthy';
+    } catch (error) {
+      services.database = 'error';
+      serviceDetails.database = { error: error.message };
+    }
+
+    // Enhanced blockchain health check
+    console.log('🔍 Running enhanced blockchain health check...');
+    const blockchainHealth = await checkBlockchainHealth();
+    services.blockchain = blockchainHealth.status;
+    serviceDetails.blockchain = blockchainHealth;
+
+    // Check email service
+    try {
+      const emailTest = await emailService.testConnection();
+      services.email = emailTest.success ? 'healthy' : 'error';
+      serviceDetails.email = emailTest;
+    } catch (error) {
+      services.email = 'error';
+      serviceDetails.email = { error: error.message };
+    }
+
+    res.json({
+      status: 'operational',
+      timestamp: new Date().toISOString(),
+      services,
+      serviceDetails, // Include detailed information
+      version: '3.2.0',
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      activeSessions: adminSessions.size,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Optional: Add a dedicated blockchain test endpoint
+app.get('/api/admin/test-blockchain', requireAdminAuth, async (req, res) => {
+  try {
+    console.log('🧪 Running comprehensive blockchain test...');
+    
+    const blockchainHealth = await checkBlockchainHealth();
+    
+    // If healthy, try a more comprehensive test
+    if (blockchainHealth.status === 'healthy') {
+      try {
+        // Test contract functions
+        const sdk = ThirdwebSDK.fromPrivateKey(
+          process.env.THIRDWEB_PRIVATE_KEY,
+          process.env.THIRDWEB_CHAIN || "polygon",
+          { 
+            clientId: process.env.THIRDWEB_CLIENT_ID,
+            secretKey: process.env.THIRDWEB_SECRET_KEY
+          }
+        );
+        
+        const contract = await sdk.getContract(process.env.THIRDWEB_CONTRACT_ADDRESS);
+        
+        // Test getting total supply (non-modifying operation)
+        const totalSupply = await contract.erc721.totalSupply();
+        blockchainHealth.details.totalSupply = totalSupply.toString();
+        
+        // Test getting contract URI
+        const contractURI = await contract.metadata.get();
+        blockchainHealth.details.contractURI = !!contractURI;
+        
+        console.log('✅ Comprehensive blockchain test completed');
+        
+      } catch (testError) {
+        console.error('⚠️ Extended blockchain test failed:', testError);
+        blockchainHealth.details.extendedTestError = testError.message;
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: 'Blockchain test completed',
+      result: blockchainHealth,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('💥 Blockchain test endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Blockchain test failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
     // Check email service
     try {
