@@ -28,50 +28,61 @@ export default async function handler(req, res) {
       throw new Error('Missing email or claim token');
     }
 
-    // 🆕 NEW: Query Supabase for the claim record
+    console.log('🔍 Verifying claim:', { email, claimToken: claimToken.substring(0, 10) + '...' });
+
+    // ✅ FIXED: Query with correct column names from your schema
     const { data: claim, error: claimError } = await supabase
       .from('claims')
       .select(`
         *,
         orders (
-          id,
+          shopify_order_id,
           customer_email,
-          product_id,
+          total_amount,
           status,
           created_at
         )
       `)
       .eq('claim_token', claimToken)
       .eq('customer_email', email)
-      .eq('status', 'pending')
+      .eq('claim_status', 'pending')  // ✅ FIXED: Use claim_status not status
       .single();
 
     if (claimError || !claim) {
-      console.error('Claim lookup error:', claimError);
+      console.error('❌ Claim lookup error:', claimError);
       throw new Error('Invalid claim token or email. Please check your details.');
     }
 
     // Check if claim has expired
-    const expiresAt = new Date(claim.expires_at);
-    const now = new Date();
-    if (now > expiresAt) {
-      throw new Error('This claim token has expired. Please contact support.');
+    if (claim.expires_at) {
+      const expiresAt = new Date(claim.expires_at);
+      const now = new Date();
+      if (now > expiresAt) {
+        throw new Error('This claim token has expired. Please contact support.');
+      }
     }
 
-    // Return order data in the format your frontend expects
-    const orderData = {
-      orderId: claim.orders.id,
-      productName: claim.orders.product_id || 'Mavire Product', // You might want to join with products table
-      customerName: email.split('@')[0], // Extract name from email or get from orders
-      orderDate: claim.orders.created_at,
-      price: 'N/A', // Add this field to your orders table if needed
-      claimStatus: claim.status,
-      expiresAt: claim.expires_at
-    };
+    console.log('✅ Claim verified successfully');
 
-    res.status(200).json(orderData);
+    // ✅ FIXED: Return format that ClaimPortal expects
+    res.status(200).json({
+      success: true,  // ClaimPortal checks for this
+      message: 'Claim verified successfully',
+      claimId: claim.id,
+      orderId: claim.orders?.shopify_order_id || claim.id,
+      productName: 'Mavire Luxury Item',
+      customerName: email.split('@')[0],
+      orderDate: claim.orders?.created_at || claim.created_at,
+      orderDetails: {
+        createdAt: claim.orders?.created_at || claim.created_at
+      }
+    });
+
   } catch (error) {
-    console.error('Verify claim error:', error);
-    res.status(400).json({ error: error.message || 'Verification failed' });
+    console.error('💥 Verify claim error:', error);
+    res.status(400).json({ 
+      success: false,  // ClaimPortal checks for this
+      error: error.message || 'Verification failed' 
+    });
   }
 }
