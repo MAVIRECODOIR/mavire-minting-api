@@ -988,10 +988,13 @@ app.post('/api/mint', async (req, res) => {
   }
 });
 
-// Test email endpoint - PROTECTED
+// Add this enhanced test email endpoint to your index.js file
+// Replace your existing '/api/test-email' endpoint with this version
+
+// Enhanced test email endpoint with database integration - PROTECTED
 app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   try {
-    console.log('🧪 Testing email service...');
+    console.log('🧪 Testing email service with database integration...');
     
     const { email, type } = req.body;
     const testEmail = email || 'test@example.com';
@@ -1022,70 +1025,208 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
         }
       });
     }
+
+    // Create REAL database entries for testing
+    const testOrderId = `TEST_${Date.now()}`;
+    const testOrderNumber = `TEST-${Math.floor(Math.random() * 1000)}`;
     
-    // Mock data for different email types
+    console.log('📝 Creating test order in database...');
+    
+    // Create test order entry
+    const { data: testOrder, error: orderError } = await db.supabase
+      .from('orders')
+      .insert([{
+        shopify_order_id: testOrderId,
+        shopify_order_number: testOrderNumber,
+        customer_email: testEmail,
+        customer_first_name: testEmail.split('@')[0],
+        customer_last_name: 'TestUser',
+        product_name: 'Test NFT Product - Admin Test',
+        product_sku: 'TEST-SKU-001',
+        order_total: 99.99,
+        currency: 'USD',
+        is_nft_eligible: true,
+        nft_template_url: 'https://via.placeholder.com/400x400.png?text=Test+NFT',
+        order_metadata: {
+          test_order: true,
+          created_by: 'admin_test',
+          timestamp: new Date().toISOString()
+        }
+      }])
+      .select()
+      .single();
+
+    if (orderError) {
+      throw new Error(`Failed to create test order: ${orderError.message}`);
+    }
+
+    console.log('✅ Test order created:', testOrder.shopify_order_id);
+
+    // Create test claim entry with real token
+    const testClaimToken = `test_claim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log('🎫 Creating test claim in database...');
+    
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 90); // 90 days from now
+    
+    const { data: testClaim, error: claimError } = await db.supabase
+      .from('claims')
+      .insert([{
+        shopify_order_id: testOrderId,
+        customer_email: testEmail,
+        claim_token: testClaimToken,
+        expires_at: expiresAt.toISOString(),
+        claim_status: 'pending',
+        metadata: {
+          test_claim: true,
+          created_by: 'admin_test',
+          email_type_tested: emailType,
+          timestamp: new Date().toISOString()
+        }
+      }])
+      .select()
+      .single();
+
+    if (claimError) {
+      throw new Error(`Failed to create test claim: ${claimError.message}`);
+    }
+
+    console.log('✅ Test claim created:', testClaim.claim_token);
+
+    // Prepare test data for emails
     const mockOrderData = {
-      shopify_order_number: 'TEST-001',
-      product_name: 'Test NFT Product',
-      product_sku: 'TEST-SKU-001',
-      customer_first_name: testEmail.split('@')[0],
-      customer_last_name: 'Tester'
+      shopify_order_number: testOrderNumber,
+      product_name: testOrder.product_name,
+      product_sku: testOrder.product_sku,
+      customer_first_name: testOrder.customer_first_name,
+      customer_last_name: testOrder.customer_last_name
     };
     
     const mockWalletData = {
       address: '0x742E8C0b13C2a2b4A5B1234567890123456789AB',
-      privateKey: '0x1234567890abcdef...' // Mock for testing
+      privateKey: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
     };
     
     const mockNftData = {
       tokenId: '123',
-      transactionHash: '0xabcdef1234567890...' // Mock for testing
+      transactionHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab'
     };
     
-    const testToken = 'test-token-' + Date.now();
-    
     let emailResult;
+    let databaseCleanup = [];
     
-    // Send different types of emails based on request
-    switch (emailType) {
-      case 'welcome':
-        emailResult = await emailService.sendWelcomeEmail(
-          testEmail, 
-          mockWalletData,
-          mockNftData,
-          mockOrderData
-        );
-        break;
-      case 'claim':
-      default:
-        emailResult = await emailService.sendClaimEmail(
-          testEmail, 
-          testToken, 
-          mockOrderData
-        );
-        break;
+    try {
+      // Send different types of emails based on request
+      switch (emailType) {
+        case 'welcome':
+          // For welcome email, update claim to completed status first
+          await db.supabase
+            .from('claims')
+            .update({
+              claim_status: 'completed',
+              claimed_at: new Date().toISOString(),
+              wallet_address: mockWalletData.address,
+              nft_token_id: mockNftData.tokenId,
+              nft_transaction_hash: mockNftData.transactionHash,
+              metadata: {
+                ...testClaim.metadata,
+                test_completed: true,
+                wallet_generated: new Date().toISOString()
+              }
+            })
+            .eq('id', testClaim.id);
+          
+          emailResult = await emailService.sendWelcomeEmail(
+            testEmail, 
+            mockWalletData,
+            mockNftData,
+            mockOrderData
+          );
+          break;
+          
+        case 'claim':
+        default:
+          emailResult = await emailService.sendClaimEmail(
+            testEmail, 
+            testClaimToken, 
+            mockOrderData
+          );
+          break;
+      }
+      
+      console.log('✅ Test email sent successfully:', emailResult);
+      
+      // Verify database entries exist
+      const verifyOrder = await db.supabase
+        .from('orders')
+        .select('*')
+        .eq('shopify_order_id', testOrderId)
+        .single();
+        
+      const verifyClaim = await db.supabase
+        .from('claims')
+        .select('*')
+        .eq('claim_token', testClaimToken)
+        .single();
+      
+      res.json({
+        success: true,
+        message: `Test ${emailType} email sent successfully to ${testEmail}`,
+        emailResult,
+        connectionTest,
+        databaseEntries: {
+          order: {
+            created: !!verifyOrder.data,
+            id: verifyOrder.data?.shopify_order_id,
+            eligible: verifyOrder.data?.is_nft_eligible
+          },
+          claim: {
+            created: !!verifyClaim.data,
+            token: verifyClaim.data?.claim_token,
+            status: verifyClaim.data?.claim_status,
+            expiresAt: verifyClaim.data?.expires_at
+          }
+        },
+        testClaimUrl: `${process.env.CLAIM_PORTAL_URL || 'https://mavire-claim-portal.vercel.app'}/claim?token=${testClaimToken}&email=${encodeURIComponent(testEmail)}`,
+        testData: {
+          recipient: testEmail,
+          emailType: emailType,
+          claimToken: testClaimToken,
+          fromEmail: process.env.FROM_EMAIL,
+          orderData: mockOrderData,
+          orderId: testOrderId,
+          orderNumber: testOrderNumber
+        },
+        instructions: [
+          'Check your inbox and spam folder',
+          'Email should arrive from customerservice@mavirecodoir.com',
+          `Look for subject containing "NFT Certificate" or "Authenticity"`,
+          'Test claim URL has been generated and can be used',
+          'Database entries created for full flow testing'
+        ],
+        cleanup: {
+          message: 'Test entries created in database',
+          order_id: testOrderId,
+          claim_token: testClaimToken,
+          note: 'These are marked as test entries and can be safely deleted'
+        }
+      });
+      
+    } catch (emailError) {
+      console.error('📧 Email sending failed:', emailError);
+      
+      // Clean up database entries if email fails
+      try {
+        await db.supabase.from('claims').delete().eq('id', testClaim.id);
+        await db.supabase.from('orders').delete().eq('shopify_order_id', testOrderId);
+        console.log('🧹 Cleaned up test entries after email failure');
+      } catch (cleanupError) {
+        console.error('⚠️ Failed to cleanup test entries:', cleanupError);
+      }
+      
+      throw emailError;
     }
-    
-    console.log('✅ Test email sent successfully:', emailResult);
-    
-    res.json({
-      success: true,
-      message: `Test ${emailType} email sent successfully to ${testEmail}`,
-      emailResult,
-      connectionTest,
-      testData: {
-        recipient: testEmail,
-        emailType: emailType,
-        claimToken: emailType === 'claim' ? testToken : undefined,
-        fromEmail: process.env.FROM_EMAIL,
-        orderData: mockOrderData
-      },
-      instructions: [
-        'Check your inbox and spam folder',
-        'Email should arrive from customerservice@mavirecodoir.com',
-        `Look for subject containing "NFT Certificate" or "Authenticity"`
-      ]
-    });
     
   } catch (error) {
     console.error('💥 Email test failed:', error);
@@ -1117,6 +1258,20 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
         'Check if admin consent was properly granted',
         'Ensure the app has permission to send from shared mailboxes'
       ];
+    } else if (error.message.includes('duplicate key value') || error.message.includes('already exists')) {
+      errorAnalysis = 'Database constraint violation - test data already exists';
+      troubleshooting = [
+        'Test data already exists in database',
+        'Previous test may not have cleaned up properly',
+        'Try again - new unique IDs will be generated'
+      ];
+    } else if (error.message.includes('foreign key')) {
+      errorAnalysis = 'Database foreign key constraint issue';
+      troubleshooting = [
+        'Order creation may have failed',
+        'Check database connection',
+        'Verify table structure matches expected schema'
+      ];
     } else if (error.message.includes('ENOTFOUND') || error.message.includes('network')) {
       errorAnalysis = 'Network connectivity issue';
       troubleshooting = [
@@ -1137,14 +1292,67 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
         clientSecret: !!process.env.MICROSOFT_CLIENT_SECRET,
         tenantId: !!process.env.MICROSOFT_TENANT_ID,
         fromEmail: !!process.env.FROM_EMAIL,
-        claimPortalUrl: !!process.env.CLAIM_PORTAL_URL
+        claimPortalUrl: !!process.env.CLAIM_PORTAL_URL,
+        supabaseUrl: !!process.env.SUPABASE_URL,
+        supabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY
       },
       nextSteps: [
         'Check Vercel deployment logs for detailed errors',
         'Verify all environment variables are set in Vercel dashboard',
         'Test Microsoft Graph connection manually using Postman or similar tool',
-        'Contact Microsoft 365 admin to verify shared mailbox configuration'
+        'Contact Microsoft 365 admin to verify shared mailbox configuration',
+        'Check Supabase database connectivity and permissions'
       ]
+    });
+  }
+});
+
+// Add a cleanup endpoint for test data - PROTECTED
+app.post('/api/admin/cleanup-test-data', requireAdminAuth, async (req, res) => {
+  try {
+    console.log('🧹 Cleaning up test data...');
+    
+    // Delete test claims (where metadata.test_claim = true)
+    const { data: deletedClaims, error: claimsError } = await db.supabase
+      .from('claims')
+      .delete()
+      .eq('metadata->test_claim', true)
+      .select();
+    
+    if (claimsError) {
+      console.error('Error deleting test claims:', claimsError);
+    }
+    
+    // Delete test orders (where metadata.test_order = true)
+    const { data: deletedOrders, error: ordersError } = await db.supabase
+      .from('orders')
+      .delete()
+      .eq('order_metadata->test_order', true)
+      .select();
+    
+    if (ordersError) {
+      console.error('Error deleting test orders:', ordersError);
+    }
+    
+    console.log(`🧹 Cleanup completed - Orders: ${deletedOrders?.length || 0}, Claims: ${deletedClaims?.length || 0}`);
+    
+    res.json({
+      success: true,
+      message: 'Test data cleanup completed',
+      cleaned: {
+        orders: deletedOrders?.length || 0,
+        claims: deletedClaims?.length || 0
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('💥 Cleanup failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Cleanup failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
